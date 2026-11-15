@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paris Shiny</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #16132e;
+    --panel: #211d45;
+    --panel-2: #2b2658;
+    --line: #3a3470;
+    --text: #efeaff;
+    --muted: #a49dd0;
+    --twitch: #9146ff;
+    --twitch-hi: #a970ff;
+    --gold: #ffd25e;
+    --ok: #5fe3a1;
+    --bad: #ff7a8a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ink); }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text); background: radial-gradient(1200px 500px at 50% -10%, #2a2360 0%, var(--ink) 60%);
+    line-height: 1.5; font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px 80px; }
+  header.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0 22px; flex-wrap: wrap; }
+  .brand { font-weight: 800; font-size: 22px; letter-spacing: -0.01em; }
+  .brand span { color: var(--gold); }
+  .me { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .me img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--twitch); }
+  button, select, input { font: inherit; color: inherit; }
+  button {
+    border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 600; cursor: pointer;
+    background: var(--panel-2); transition: background .15s, transform .05s;
+  }
+  button:hover { background: var(--line); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--twitch); }
+  button.primary:hover { background: var(--twitch-hi); }
+  button.gold { background: var(--gold); color: #3a2b00; }
+  button.gold:hover { background: #ffe08a; }
+  button.danger { background: transparent; color: var(--bad); padding: 6px 10px; }
+  button.danger:hover { background: rgba(255,122,138,.12); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; margin-bottom: 18px; }
+  .hunt-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: clamp(26px, 5vw, 38px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+  .sub { color: var(--muted); margin-top: 6px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--panel-2); }
+  .badge.open { background: rgba(95,227,161,.15); color: var(--ok); }
+  .badge.finished { background: rgba(255,210,94,.15); color: var(--gold); }
+  select.hunt-select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: 100%; }
+
+  /* Compteur de pari : l'élément principal de la page */
+  .counter { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; margin-top: 14px; }
+  .counter input {
+    flex: 1 1 200px; min-width: 0; text-align: center;
+    font-size: clamp(40px, 12vw, 64px); font-weight: 800; letter-spacing: -0.02em;
+    background: var(--ink); border: 2px dashed var(--gold); border-radius: 16px; padding: 10px 14px;
+  }
+  .counter input::placeholder { color: #4b4580; }
+  .counter button { flex: 0 0 auto; font-size: 18px; padding: 0 26px; min-height: 64px; }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 10px; }
+  .mine { font-size: clamp(40px, 10vw, 56px); font-weight: 800; color: var(--gold); line-height: 1; margin: 8px 0 2px; }
+
+  .result { text-align: center; padding: 8px 0 4px; }
+  .result .big { font-size: clamp(56px, 16vw, 96px); font-weight: 800; color: var(--gold); line-height: 1; letter-spacing: -0.03em; }
+  .result .lbl { color: var(--muted); }
+
+  h2 { font-size: 20px; margin: 0 0 14px; font-weight: 800; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    position: relative; display: grid; grid-template-columns: 44px 1fr auto auto; gap: 12px; align-items: center;
+    padding: 10px 12px; border-radius: 12px; background: var(--panel-2); overflow: hidden;
+  }
+  .row .bar { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, rgba(145,70,255,.35), rgba(145,70,255,0)); pointer-events: none; }
+  .row > * { position: relative; }
+  .row.me-row { outline: 2px solid var(--twitch-hi); }
+  .rank { font-weight: 800; font-size: 20px; text-align: center; color: var(--muted); }
+  .rank.r1 { color: var(--gold); font-size: 26px; }
+  .rank.r2 { color: #d9d9ee; }
+  .rank.r3 { color: #e0a070; }
+  .who { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; }
+  .who img { width: 28px; height: 28px; border-radius: 50%; flex: none; }
+  .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .guess { font-weight: 800; font-size: 20px; }
+  .diff { font-size: 14px; color: var(--muted); min-width: 70px; text-align: right; }
+  .diff.exact { color: var(--ok); font-weight: 600; }
+  .empty { color: var(--muted); padding: 10px 0; }
+
+  .admin { border-color: var(--gold); }
+  .admin h2 { color: var(--gold); }
+  .admin form, .admin .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+  .admin label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+  .admin input { background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--text); }
+  .admin hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 12px 18px; border-radius: 12px; max-width: 90vw; z-index: 10; display: none; }
+  #toast.err { border-color: var(--bad); color: var(--bad); }
+  #toast.ok { border-color: var(--ok); color: var(--ok); }
+  .setup { color: var(--bad); }
+  @media (max-width: 520px) { .row { grid-template-columns: 34px 1fr auto; } .diff { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Paris <span>Shiny</span> ✨</div>
+    <div id="auth"></div>
+  </header>
+  <main id="app"><p class="empty">Chargement…</p></main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ============ CONFIG — à remplacer par les valeurs de ton projet Supabase ============ */
+const SUPABASE_URL = 'https://jplagdoqinnroyzirixo.supabase.co/auth/v1/callback';
+const SUPABASE_ANON_KEY = 'sb_publishable_Zkm1ciPZhffNzdlhdsKq-Q_jnhUi6wU';
+/* (la clé "anon" est publique par conception : la sécurité repose sur les règles RLS du schema.sql) */
+/* ==================================================================================== */
+
+const configured = !SUPABASE_URL.includes('VOTRE-PROJET');
+const $app = document.getElementById('app');
+const $auth = document.getElementById('auth');
+const $toast = document.getElementById('toast');
+
+let sb = null;
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [] };
+
+/* ---------- petits utilitaires (aucun innerHTML avec des données utilisateur) ---------- */
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'value') el.value = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+let toastTimer;
+function toast(msg, type = 'ok') {
+  $toast.textContent = msg; $toast.className = type; $toast.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $toast.style.display = 'none'; }, 4500);
+}
+const fmtDate = d => new Date(d).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+const fmtNum = n => Number(n).toLocaleString('fr-FR');
+const twitchName = u => u?.user_metadata?.preferred_username || u?.user_metadata?.user_name || u?.user_metadata?.name || 'Anonyme';
+const avatar = u => u?.user_metadata?.avatar_url || u?.user_metadata?.picture || '';
+
+const hunt = () => state.hunts.find(x => x.id === state.huntId) || null;
+const isOpen = x => x && x.status === 'open' && (!x.closes_at || new Date(x.closes_at) > new Date());
+const myBet = () => state.bets.find(b => b.user_id === state.user?.id) || null;
+
+/* ---------- données ---------- */
+async function loadHunts() {
+  const { data, error } = await sb.from('hunts').select('*').order('created_at', { ascending: false });
+  if (error) return toast('Impossible de charger les chasses : ' + error.message, 'err');
+  state.hunts = data;
+  if (!state.huntId || !data.some(x => x.id === state.huntId)) {
+    state.huntId = (data.find(x => x.status !== 'finished') || data[0] || {}).id || null;
+  }
+}
+async function loadBets() {
+  if (!state.huntId) { state.bets = []; return; }
+  const { data, error } = await sb.from('bets').select('*').eq('hunt_id', state.huntId).order('created_at', { ascending: true });
+  if (error) return toast('Impossible de charger les paris : ' + error.message, 'err');
+  state.bets = data;
+}
+async function loadAdmin() {
+  state.isAdmin = false;
+  if (!state.user) return;
+  const { data } = await sb.from('admins').select('user_id').eq('user_id', state.user.id).maybeSingle();
+  state.isAdmin = !!data;
+}
+async function refresh() { await loadHunts(); await loadBets(); render(); }
+
+/* ---------- actions ---------- */
+function login() {
+  sb.auth.signInWithOAuth({ provider: 'twitch', options: { redirectTo: location.origin + location.pathname } });
+}
+async function logout() { await sb.auth.signOut(); }
+
+async function placeBet(ev) {
+  ev.preventDefault();
+  const input = ev.target.elements.guess;
+  const guess = parseInt(input.value, 10);
+  if (!Number.isInteger(guess) || guess < 1) return toast('Entre un nombre de rencontres supérieur à 0.', 'err');
+  const { error } = await sb.from('bets').insert({ hunt_id: state.huntId, guess });
+  if (error) {
+    if (error.code === '23505') toast('Tu as déjà parié sur cette chasse.', 'err');
+    else if (error.code === '42501') toast('Les paris sont fermés pour cette chasse.', 'err');
+    else toast('Erreur : ' + error.message, 'err');
+    return refresh();
+  }
+  toast('Pari enregistré. Bonne chance !');
+  refresh();
+}
+
+async function createHunt(ev) {
+  ev.preventDefault();
+  const f = ev.target.elements;
+  const row = { title: f.title.value.trim(), pokemon: f.pokemon.value.trim() || null };
+  if (f.closes.value) row.closes_at = new Date(f.closes.value).toISOString();
+  if (!row.title) return toast('Donne un titre à la chasse.', 'err');
+  const { data, error } = await sb.from('hunts').insert(row).select().single();
+  if (error) return toast('Création impossible : ' + error.message, 'err');
+  state.huntId = data.id; toast('Chasse créée.'); ev.target.reset(); refresh();
+}
+async function setStatus(status) {
+  const { error } = await sb.from('hunts').update({ status }).eq('id', state.huntId);
+  if (error) return toast(error.message, 'err');
+  toast(status === 'open' ? 'Paris rouverts.' : 'Paris fermés.'); refresh();
+}
+async function finishHunt(ev) {
+  ev.preventDefault();
+  const n = parseInt(ev.target.elements.result.value, 10);
+  if (!Number.isInteger(n) || n < 1) return toast('Entre le nombre final de rencontres.', 'err');
+  if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final ? Les paris seront clos.')) return;
+  const { error } = await sb.from('hunts').update({ result: n, status: 'finished' }).eq('id', state.huntId);
+  if (error) return toast(error.message, 'err');
+  toast('Résultat enregistré, le classement est publié.'); refresh();
+}
+async function reopenResult() {
+  if (!confirm('Annuler le résultat et repasser la chasse en « paris fermés » ?')) return;
+  const { error } = await sb.from('hunts').update({ result: null, status: 'closed' }).eq('id', state.huntId);
+  if (error) return toast(error.message, 'err');
+  refresh();
+}
+async function deleteHunt() {
+  if (!confirm('Supprimer cette chasse et tous ses paris ? Action définitive.')) return;
+  const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
+  if (error) return toast(error.message, 'err');
+  state.huntId = null; toast('Chasse supprimée.'); refresh();
+}
+async function deleteBet(id) {
+  if (!confirm('Supprimer ce pari ?')) return;
+  const { error } = await sb.from('bets').delete().eq('id', id);
+  if (error) return toast(error.message, 'err');
+  refresh();
+}
+
+/* ---------- rendu ---------- */
+function renderAuth() {
+  $auth.replaceChildren();
+  if (state.user) {
+    $auth.append(h('div', { class: 'me' },
+      avatar(state.user) && h('img', { src: avatar(state.user), alt: '' }),
+      h('span', {}, twitchName(state.user)),
+      h('button', { onclick: logout }, 'Se déconnecter')));
+  } else if (configured) {
+    $auth.append(h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch'));
+  }
+}
+
+function betRow(b, rank, result, maxDiff) {
+  const diff = result == null ? null : Math.abs(b.guess - result);
+  const pct = diff == null ? 0 : Math.max(4, 100 - (maxDiff ? (diff / maxDiff) * 96 : 0));
+  const rankCls = 'rank' + (rank <= 3 && result != null ? ' r' + rank : '');
+  return h('div', { class: 'row' + (b.user_id === state.user?.id ? ' me-row' : '') },
+    result != null && h('div', { class: 'bar', style: 'width:' + pct + '%' }),
+    h('div', { class: rankCls }, result != null ? rank : '•'),
+    h('div', { class: 'who' }, b.twitch_avatar && h('img', { src: b.twitch_avatar, alt: '', loading: 'lazy' }), h('span', {}, b.twitch_name)),
+    h('div', { class: 'guess' }, fmtNum(b.guess)),
+    h('div', { class: 'diff' + (diff === 0 ? ' exact' : '') },
+      diff == null ? '' : diff === 0 ? 'Pile !' : '± ' + fmtNum(diff)),
+    state.isAdmin && h('button', { class: 'danger', title: 'Supprimer ce pari', onclick: () => deleteBet(b.id) }, 'Suppr.'));
+}
+
+function render() {
+  renderAuth();
+  if (!configured) {
+    $app.replaceChildren(h('div', { class: 'card' },
+      h('h2', {}, 'Configuration manquante'),
+      h('p', { class: 'setup' }, 'Renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du script de index.html (voir le README).')));
+    return;
+  }
+  const cur = hunt();
+  const nodes = [];
+
+  if (!cur) {
+    nodes.push(h('div', { class: 'card' }, h('h2', {}, 'Aucune chasse pour le moment'),
+      h('p', { class: 'empty' }, state.isAdmin ? 'Crée la première chasse avec le panneau admin ci-dessous.' : 'Reviens bientôt, une chasse va démarrer.')));
+  } else {
+    const open = isOpen(cur);
+    const finished = cur.status === 'finished';
+
+    // En-tête de la chasse
+    const select = state.hunts.length > 1 && h('select', { class: 'hunt-select', 'aria-label': 'Choisir une chasse',
+      onchange: async e => { state.huntId = e.target.value; await loadBets(); render(); } },
+      state.hunts.map(x => h('option', { value: x.id, selected: x.id === cur.id }, x.title)));
+    nodes.push(h('section', { class: 'card' },
+      h('div', { class: 'hunt-head' },
+        h('div', {},
+          h('h1', {}, cur.title),
+          h('div', { class: 'sub' }, [cur.pokemon, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
+        h('div', {}, h('span', { class: 'badge ' + (finished ? 'finished' : open ? 'open' : '') },
+          finished ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés'))),
+      cur.closes_at && !finished && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at)),
+      select && h('div', { style: 'margin-top:14px' }, select)));
+
+    // Résultat OU formulaire de pari
+    if (finished) {
+      nodes.push(h('section', { class: 'card result' },
+        h('div', { class: 'lbl' }, 'Le shiny est tombé à'),
+        h('div', { class: 'big' }, fmtNum(cur.result)),
+        h('div', { class: 'lbl' }, 'rencontres')));
+    } else {
+      const mine = myBet();
+      let body;
+      if (mine) {
+        body = [h('div', { class: 'lbl hint' }, 'Ton pari'), h('div', { class: 'mine' }, fmtNum(mine.guess)),
+          h('div', { class: 'hint' }, 'Il est enregistré et ne peut plus être modifié.')];
+      } else if (!open) {
+        body = [h('p', { class: 'empty' }, 'Les paris sont fermés pour cette chasse.')];
+      } else if (!state.user) {
+        body = [h('p', {}, 'Connecte-toi avec ton compte Twitch pour parier. Ton pseudo est récupéré automatiquement.'),
+          h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch')];
+      } else {
+        body = [h('form', { class: 'counter', onsubmit: placeBet },
+            h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres' }),
+            h('button', { class: 'gold', type: 'submit' }, 'Valider mon pari')),
+          h('div', { class: 'hint' }, 'Combien de rencontres avant le shiny ? Un seul pari par compte, impossible de le changer ensuite.')];
+      }
+      nodes.push(h('section', { class: 'card' }, h('h2', {}, 'Ton pari'), body));
+    }
+
+    // Liste / classement
+    let sorted, title;
+    if (finished) {
+      sorted = [...state.bets].sort((a, b) => Math.abs(a.guess - cur.result) - Math.abs(b.guess - cur.result) || new Date(a.created_at) - new Date(b.created_at));
+      title = 'Classement';
+    } else {
+      sorted = [...state.bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      title = 'Paris en cours';
+    }
+    const maxDiff = finished && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - cur.result) : 0;
+    nodes.push(h('section', { class: 'card' },
+      h('h2', {}, title),
+      sorted.length
+        ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, finished ? cur.result : null, maxDiff)))
+        : h('p', { class: 'empty' }, 'Aucun pari pour le moment. Sois le premier !'),
+      finished && sorted.length > 1 && h('div', { class: 'hint' }, 'À égalité d’écart, le pari le plus ancien passe devant.')));
+  }
+
+  // Panneau admin
+  if (state.isAdmin) {
+    const cur2 = hunt();
+    nodes.push(h('section', { class: 'card admin' },
+      h('h2', {}, 'Panneau admin'),
+      h('form', { onsubmit: createHunt },
+        h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
+        h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
+        h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
+        h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
+      cur2 && h('hr'),
+      cur2 && cur2.status !== 'finished' && h('div', { class: 'actions' },
+        cur2.status === 'open'
+          ? h('button', { onclick: () => setStatus('closed') }, 'Fermer les paris')
+          : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
+      cur2 && cur2.status !== 'finished' && h('form', { onsubmit: finishHunt },
+        h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
+        h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat')),
+      cur2 && cur2.status === 'finished' && h('div', { class: 'actions' },
+        h('button', { onclick: reopenResult }, 'Annuler le résultat')),
+      cur2 && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse'))));
+  }
+
+  $app.replaceChildren(...nodes);
+}
+
+/* ---------- démarrage ---------- */
+async function start() {
+  if (!configured) return render();
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data } = await sb.auth.getSession();
+  state.user = data.session?.user || null;
+  await loadAdmin();
+  await refresh();
+  sb.auth.onAuthStateChange(async (_evt, session) => {
+    const uid = session?.user?.id || null;
+    if (uid === (state.user?.id || null)) return;
+    state.user = session?.user || null;
+    await loadAdmin(); await refresh();
+  });
+  // rafraîchissement doux toutes les 20 s quand l'onglet est visible
+  setInterval(() => {
+    if (document.hidden || document.activeElement?.tagName === 'INPUT') return;
+    refresh();
+  }, 20000);
+}
+start();
+</script>
+</body>
+</html>
