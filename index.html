@@ -57,10 +57,16 @@
   .hunt-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
   h1 { margin: 0; font-size: clamp(26px, 5vw, 38px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
   .sub { color: var(--muted); margin-top: 6px; }
-  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--panel-2); }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--panel-2); white-space: nowrap; }
   .badge.open { background: rgba(95,227,161,.15); color: var(--ok); }
   .badge.finished { background: rgba(255,210,94,.15); color: var(--gold); }
   select.hunt-select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: 100%; }
+
+  /* Une section par console : la couleur d'accent change selon la console */
+  .plat { border-left: 6px solid var(--p); }
+  .plat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .plat-head h2 { margin: 0; color: var(--p); font-size: 24px; }
+  h3 { font-size: 16px; margin: 22px 0 10px; font-weight: 800; color: var(--muted); }
 
   /* Compteur de pari : l'élément principal de la page */
   .counter { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; margin-top: 14px; }
@@ -74,8 +80,8 @@
   .hint { color: var(--muted); font-size: 14px; margin-top: 10px; }
   .mine { font-size: clamp(40px, 10vw, 56px); font-weight: 800; color: var(--gold); line-height: 1; margin: 8px 0 2px; }
 
-  .result { text-align: center; padding: 8px 0 4px; }
-  .result .big { font-size: clamp(56px, 16vw, 96px); font-weight: 800; color: var(--gold); line-height: 1; letter-spacing: -0.03em; }
+  .result { text-align: center; padding: 12px 0 4px; }
+  .result .big { font-size: clamp(52px, 15vw, 88px); font-weight: 800; color: var(--gold); line-height: 1; letter-spacing: -0.03em; }
   .result .lbl { color: var(--muted); }
 
   h2 { font-size: 20px; margin: 0 0 14px; font-weight: 800; }
@@ -105,6 +111,8 @@
   .admin label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
   .admin input { background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--text); }
   .admin hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+  .admin .res-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .admin .res-line strong { color: var(--gold); }
 
   #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 12px 18px; border-radius: 12px; max-width: 90vw; z-index: 10; display: none; }
   #toast.err { border-color: var(--bad); color: var(--bad); }
@@ -129,13 +137,19 @@
 /* ============ CONFIG — à remplacer par les valeurs de ton projet Supabase ============ */
 const SUPABASE_URL = 'https://jplagdoqinnroyzirixo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Zkm1ciPZhffNzdlhdsKq-Q_jnhUi6wU';
-/* (la clé "anon" est publique par conception : la sécurité repose sur les règles RLS du schema.sql) */
+/* (la clé publique est faite pour être visible : la sécurité repose sur les règles RLS du schema.sql) */
 /* ==================================================================================== */
 
-const configured = !SUPABASE_URL.includes('VOTRE-PROJET');
+const configured = !SUPABASE_URL.includes('VOTRE-PROJET') && !SUPABASE_ANON_KEY.includes('VOTRE_CLE');
 const $app = document.getElementById('app');
 const $auth = document.getElementById('auth');
 const $toast = document.getElementById('toast');
+
+/* Les deux consoles de la double chasse */
+const PLATFORMS = [
+  { key: 'switch', label: 'Switch', col: 'result_switch', color: '#ff6a78' },
+  { key: '3ds',    label: '3DS',    col: 'result_3ds',    color: '#4fc3f7' },
+];
 
 let sb = null;
 const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [] };
@@ -168,7 +182,9 @@ const avatar = u => u?.user_metadata?.avatar_url || u?.user_metadata?.picture ||
 
 const hunt = () => state.hunts.find(x => x.id === state.huntId) || null;
 const isOpen = x => x && x.status === 'open' && (!x.closes_at || new Date(x.closes_at) > new Date());
-const myBet = () => state.bets.find(b => b.user_id === state.user?.id) || null;
+const resultOf = (x, p) => x[p.col];
+const betsOf = p => state.bets.filter(b => b.platform === p.key);
+const myBet = p => betsOf(p).find(b => b.user_id === state.user?.id) || null;
 
 /* ---------- données ---------- */
 async function loadHunts() {
@@ -199,19 +215,19 @@ function login() {
 }
 async function logout() { await sb.auth.signOut(); }
 
-async function placeBet(ev) {
+async function placeBet(ev, p) {
   ev.preventDefault();
   const input = ev.target.elements.guess;
   const guess = parseInt(input.value, 10);
   if (!Number.isInteger(guess) || guess < 1) return toast('Entre un nombre de rencontres supérieur à 0.', 'err');
-  const { error } = await sb.from('bets').insert({ hunt_id: state.huntId, guess });
+  const { error } = await sb.from('bets').insert({ hunt_id: state.huntId, platform: p.key, guess });
   if (error) {
-    if (error.code === '23505') toast('Tu as déjà parié sur cette chasse.', 'err');
-    else if (error.code === '42501') toast('Les paris sont fermés pour cette chasse.', 'err');
+    if (error.code === '23505') toast('Tu as déjà parié sur la ' + p.label + ' pour cette chasse.', 'err');
+    else if (error.code === '42501') toast('Les paris sont fermés pour la ' + p.label + '.', 'err');
     else toast('Erreur : ' + error.message, 'err');
     return refresh();
   }
-  toast('Pari enregistré. Bonne chance !');
+  toast('Pari ' + p.label + ' enregistré. Bonne chance !');
   refresh();
 }
 
@@ -230,23 +246,30 @@ async function setStatus(status) {
   if (error) return toast(error.message, 'err');
   toast(status === 'open' ? 'Paris rouverts.' : 'Paris fermés.'); refresh();
 }
-async function finishHunt(ev) {
+async function finishPlatform(ev, p) {
   ev.preventDefault();
   const n = parseInt(ev.target.elements.result.value, 10);
   if (!Number.isInteger(n) || n < 1) return toast('Entre le nombre final de rencontres.', 'err');
-  if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final ? Les paris seront clos.')) return;
-  const { error } = await sb.from('hunts').update({ result: n, status: 'finished' }).eq('id', state.huntId);
+  if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final de la ' + p.label + ' ? Les paris ' + p.label + ' seront clos.')) return;
+  const cur = hunt();
+  const other = PLATFORMS.find(q => q.key !== p.key);
+  const patch = { [p.col]: n };
+  if (resultOf(cur, other) != null) patch.status = 'finished';   // les deux consoles ont leur résultat
+  const { error } = await sb.from('hunts').update(patch).eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
-  toast('Résultat enregistré, le classement est publié.'); refresh();
+  toast('Résultat ' + p.label + ' enregistré, le classement est publié.'); refresh();
 }
-async function reopenResult() {
-  if (!confirm('Annuler le résultat et repasser la chasse en « paris fermés » ?')) return;
-  const { error } = await sb.from('hunts').update({ result: null, status: 'closed' }).eq('id', state.huntId);
+async function reopenResult(p) {
+  if (!confirm('Annuler le résultat de la ' + p.label + ' ?')) return;
+  const cur = hunt();
+  const patch = { [p.col]: null };
+  if (cur.status === 'finished') patch.status = 'closed';
+  const { error } = await sb.from('hunts').update(patch).eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   refresh();
 }
 async function deleteHunt() {
-  if (!confirm('Supprimer cette chasse et tous ses paris ? Action définitive.')) return;
+  if (!confirm('Supprimer cette chasse et tous ses paris (Switch et 3DS) ? Action définitive.')) return;
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   state.huntId = null; toast('Chasse supprimée.'); refresh();
@@ -285,6 +308,86 @@ function betRow(b, rank, result, maxDiff) {
     state.isAdmin && h('button', { class: 'danger', title: 'Supprimer ce pari', onclick: () => deleteBet(b.id) }, 'Suppr.'));
 }
 
+/* Une section complète pour une console : pari + résultat + liste/classement */
+function platformSection(cur, p) {
+  const result = resultOf(cur, p);
+  const done = result != null;
+  const open = isOpen(cur) && !done;
+  const bets = betsOf(p);
+  const mine = myBet(p);
+
+  let top;
+  if (done) {
+    top = h('div', { class: 'result' },
+      h('div', { class: 'lbl' }, 'Le shiny est tombé à'),
+      h('div', { class: 'big' }, fmtNum(result)),
+      h('div', { class: 'lbl' }, 'rencontres sur ' + p.label));
+  } else if (mine) {
+    top = h('div', {},
+      h('div', { class: 'hint' }, 'Ton pari ' + p.label),
+      h('div', { class: 'mine' }, fmtNum(mine.guess)),
+      h('div', { class: 'hint' }, 'Il est enregistré et ne peut plus être modifié.'));
+  } else if (!open) {
+    top = h('p', { class: 'empty' }, 'Les paris sont fermés pour la ' + p.label + '.');
+  } else if (!state.user) {
+    top = h('div', {},
+      h('p', {}, 'Connecte-toi avec ton compte Twitch pour parier. Ton pseudo est récupéré automatiquement.'),
+      h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch'));
+  } else {
+    top = h('div', {},
+      h('form', { class: 'counter', onsubmit: ev => placeBet(ev, p) },
+        h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres sur ' + p.label }),
+        h('button', { class: 'gold', type: 'submit' }, 'Parier sur la ' + p.label)),
+      h('div', { class: 'hint' }, 'Combien de rencontres avant le shiny sur ' + p.label + ' ? Un pari par console, impossible de le changer ensuite.'));
+  }
+
+  let sorted;
+  if (done) {
+    sorted = [...bets].sort((a, b) => Math.abs(a.guess - result) - Math.abs(b.guess - result) || new Date(a.created_at) - new Date(b.created_at));
+  } else {
+    sorted = [...bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+  const maxDiff = done && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - result) : 0;
+
+  return h('section', { class: 'card plat', style: '--p:' + p.color },
+    h('div', { class: 'plat-head' },
+      h('h2', {}, 'Chasse ' + p.label),
+      h('span', { class: 'badge ' + (done ? 'finished' : open ? 'open' : '') },
+        done ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés')),
+    top,
+    h('h3', {}, (done ? 'Classement ' : 'Paris en cours ') + p.label + ' (' + bets.length + ')'),
+    sorted.length
+      ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, done ? result : null, maxDiff)))
+      : h('p', { class: 'empty' }, 'Aucun pari ' + p.label + ' pour le moment. Sois le premier !'),
+    done && sorted.length > 1 && h('div', { class: 'hint' }, 'À égalité d’écart, le pari le plus ancien passe devant.'));
+}
+
+function adminPanel() {
+  const cur = hunt();
+  return h('section', { class: 'card admin' },
+    h('h2', {}, 'Panneau admin'),
+    h('form', { onsubmit: createHunt },
+      h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
+      h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
+      h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
+      h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
+    cur && h('hr'),
+    cur && cur.status !== 'finished' && h('div', { class: 'actions' },
+      cur.status === 'open'
+        ? h('button', { onclick: () => setStatus('closed') }, 'Fermer tous les paris')
+        : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
+    cur && PLATFORMS.map(p => {
+      const r = resultOf(cur, p);
+      return r != null
+        ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat ' + p.label + ' : '), h('strong', {}, fmtNum(r)),
+            h('button', { onclick: () => reopenResult(p) }, 'Annuler'))
+        : h('form', { onsubmit: ev => finishPlatform(ev, p) },
+            h('label', {}, 'Rencontres finales ' + p.label, h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
+            h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat ' + p.label));
+    }),
+    cur && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse')));
+}
+
 function render() {
   renderAuth();
   if (!configured) {
@@ -300,90 +403,26 @@ function render() {
     nodes.push(h('div', { class: 'card' }, h('h2', {}, 'Aucune chasse pour le moment'),
       h('p', { class: 'empty' }, state.isAdmin ? 'Crée la première chasse avec le panneau admin ci-dessous.' : 'Reviens bientôt, une chasse va démarrer.')));
   } else {
-    const open = isOpen(cur);
     const finished = cur.status === 'finished';
-
-    // En-tête de la chasse
+    const open = isOpen(cur);
     const select = state.hunts.length > 1 && h('select', { class: 'hunt-select', 'aria-label': 'Choisir une chasse',
       onchange: async e => { state.huntId = e.target.value; await loadBets(); render(); } },
       state.hunts.map(x => h('option', { value: x.id, selected: x.id === cur.id }, x.title)));
+
     nodes.push(h('section', { class: 'card' },
       h('div', { class: 'hunt-head' },
         h('div', {},
           h('h1', {}, cur.title),
-          h('div', { class: 'sub' }, [cur.pokemon, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
+          h('div', { class: 'sub' }, [cur.pokemon, 'Double chasse Switch + 3DS', state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
         h('div', {}, h('span', { class: 'badge ' + (finished ? 'finished' : open ? 'open' : '') },
           finished ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés'))),
       cur.closes_at && !finished && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at)),
       select && h('div', { style: 'margin-top:14px' }, select)));
 
-    // Résultat OU formulaire de pari
-    if (finished) {
-      nodes.push(h('section', { class: 'card result' },
-        h('div', { class: 'lbl' }, 'Le shiny est tombé à'),
-        h('div', { class: 'big' }, fmtNum(cur.result)),
-        h('div', { class: 'lbl' }, 'rencontres')));
-    } else {
-      const mine = myBet();
-      let body;
-      if (mine) {
-        body = [h('div', { class: 'lbl hint' }, 'Ton pari'), h('div', { class: 'mine' }, fmtNum(mine.guess)),
-          h('div', { class: 'hint' }, 'Il est enregistré et ne peut plus être modifié.')];
-      } else if (!open) {
-        body = [h('p', { class: 'empty' }, 'Les paris sont fermés pour cette chasse.')];
-      } else if (!state.user) {
-        body = [h('p', {}, 'Connecte-toi avec ton compte Twitch pour parier. Ton pseudo est récupéré automatiquement.'),
-          h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch')];
-      } else {
-        body = [h('form', { class: 'counter', onsubmit: placeBet },
-            h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres' }),
-            h('button', { class: 'gold', type: 'submit' }, 'Valider mon pari')),
-          h('div', { class: 'hint' }, 'Combien de rencontres avant le shiny ? Un seul pari par compte, impossible de le changer ensuite.')];
-      }
-      nodes.push(h('section', { class: 'card' }, h('h2', {}, 'Ton pari'), body));
-    }
-
-    // Liste / classement
-    let sorted, title;
-    if (finished) {
-      sorted = [...state.bets].sort((a, b) => Math.abs(a.guess - cur.result) - Math.abs(b.guess - cur.result) || new Date(a.created_at) - new Date(b.created_at));
-      title = 'Classement';
-    } else {
-      sorted = [...state.bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      title = 'Paris en cours';
-    }
-    const maxDiff = finished && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - cur.result) : 0;
-    nodes.push(h('section', { class: 'card' },
-      h('h2', {}, title),
-      sorted.length
-        ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, finished ? cur.result : null, maxDiff)))
-        : h('p', { class: 'empty' }, 'Aucun pari pour le moment. Sois le premier !'),
-      finished && sorted.length > 1 && h('div', { class: 'hint' }, 'À égalité d’écart, le pari le plus ancien passe devant.')));
+    PLATFORMS.forEach(p => nodes.push(platformSection(cur, p)));
   }
 
-  // Panneau admin
-  if (state.isAdmin) {
-    const cur2 = hunt();
-    nodes.push(h('section', { class: 'card admin' },
-      h('h2', {}, 'Panneau admin'),
-      h('form', { onsubmit: createHunt },
-        h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
-        h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
-        h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
-        h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
-      cur2 && h('hr'),
-      cur2 && cur2.status !== 'finished' && h('div', { class: 'actions' },
-        cur2.status === 'open'
-          ? h('button', { onclick: () => setStatus('closed') }, 'Fermer les paris')
-          : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
-      cur2 && cur2.status !== 'finished' && h('form', { onsubmit: finishHunt },
-        h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
-        h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat')),
-      cur2 && cur2.status === 'finished' && h('div', { class: 'actions' },
-        h('button', { onclick: reopenResult }, 'Annuler le résultat')),
-      cur2 && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse'))));
-  }
-
+  if (state.isAdmin) nodes.push(adminPanel());
   $app.replaceChildren(...nodes);
 }
 
