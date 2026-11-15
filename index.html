@@ -110,6 +110,9 @@
   .admin form, .admin .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
   .admin label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
   .admin input { background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; color: var(--text); }
+  .admin .consoles { display: flex; gap: 14px; align-items: center; padding-bottom: 8px; }
+  .admin label.chk { flex-direction: row; align-items: center; gap: 6px; color: var(--text); font-size: 16px; }
+  .admin label.chk input { width: 18px; height: 18px; padding: 0; accent-color: var(--twitch); }
   .admin hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   .admin .res-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .admin .res-line strong { color: var(--gold); }
@@ -183,6 +186,8 @@ const avatar = u => u?.user_metadata?.avatar_url || u?.user_metadata?.picture ||
 const hunt = () => state.hunts.find(x => x.id === state.huntId) || null;
 const isOpen = x => x && x.status === 'open' && (!x.closes_at || new Date(x.closes_at) > new Date());
 const resultOf = (x, p) => x[p.col];
+/* consoles concernées par une chasse (par défaut les deux) */
+const platsOf = x => PLATFORMS.filter(p => (x.platforms || ['switch', '3ds']).includes(p.key));
 const betsOf = p => state.bets.filter(b => b.platform === p.key);
 const myBet = p => betsOf(p).find(b => b.user_id === state.user?.id) || null;
 
@@ -236,7 +241,9 @@ async function createHunt(ev) {
   const f = ev.target.elements;
   const row = { title: f.title.value.trim(), pokemon: f.pokemon.value.trim() || null };
   if (f.closes.value) row.closes_at = new Date(f.closes.value).toISOString();
+  row.platforms = PLATFORMS.filter(p => f['p_' + p.key].checked).map(p => p.key);
   if (!row.title) return toast('Donne un titre à la chasse.', 'err');
+  if (!row.platforms.length) return toast('Coche au moins une console (Switch ou 3DS).', 'err');
   const { data, error } = await sb.from('hunts').insert(row).select().single();
   if (error) return toast('Création impossible : ' + error.message, 'err');
   state.huntId = data.id; toast('Chasse créée.'); ev.target.reset(); refresh();
@@ -252,9 +259,9 @@ async function finishPlatform(ev, p) {
   if (!Number.isInteger(n) || n < 1) return toast('Entre le nombre final de rencontres.', 'err');
   if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final de la ' + p.label + ' ? Les paris ' + p.label + ' seront clos.')) return;
   const cur = hunt();
-  const other = PLATFORMS.find(q => q.key !== p.key);
   const patch = { [p.col]: n };
-  if (resultOf(cur, other) != null) patch.status = 'finished';   // les deux consoles ont leur résultat
+  // la chasse est terminée quand toutes ses consoles ont leur résultat
+  if (platsOf(cur).every(q => q.key === p.key || resultOf(cur, q) != null)) patch.status = 'finished';
   const { error } = await sb.from('hunts').update(patch).eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   toast('Résultat ' + p.label + ' enregistré, le classement est publié.'); refresh();
@@ -370,13 +377,15 @@ function adminPanel() {
       h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
       h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
       h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
+      h('div', { class: 'consoles' },
+        PLATFORMS.map(p => h('label', { class: 'chk' }, h('input', { type: 'checkbox', name: 'p_' + p.key, checked: true }), p.label))),
       h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
     cur && h('hr'),
     cur && cur.status !== 'finished' && h('div', { class: 'actions' },
       cur.status === 'open'
         ? h('button', { onclick: () => setStatus('closed') }, 'Fermer tous les paris')
         : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
-    cur && PLATFORMS.map(p => {
+    cur && platsOf(cur).map(p => {
       const r = resultOf(cur, p);
       return r != null
         ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat ' + p.label + ' : '), h('strong', {}, fmtNum(r)),
@@ -413,13 +422,13 @@ function render() {
       h('div', { class: 'hunt-head' },
         h('div', {},
           h('h1', {}, cur.title),
-          h('div', { class: 'sub' }, [cur.pokemon, 'Double chasse Switch + 3DS', state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
+          h('div', { class: 'sub' }, [cur.pokemon, platsOf(cur).length > 1 ? 'Double chasse Switch + 3DS' : 'Chasse ' + platsOf(cur)[0].label, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
         h('div', {}, h('span', { class: 'badge ' + (finished ? 'finished' : open ? 'open' : '') },
           finished ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés'))),
       cur.closes_at && !finished && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at)),
       select && h('div', { style: 'margin-top:14px' }, select)));
 
-    PLATFORMS.forEach(p => nodes.push(platformSection(cur, p)));
+    platsOf(cur).forEach(p => nodes.push(platformSection(cur, p)));
   }
 
   if (state.isAdmin) nodes.push(adminPanel());
