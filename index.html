@@ -80,6 +80,11 @@
   .hint { color: var(--muted); font-size: 14px; margin-top: 10px; }
   .mine { font-size: clamp(40px, 10vw, 56px); font-weight: 800; color: var(--gold); line-height: 1; margin: 8px 0 2px; }
 
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab { display: flex; align-items: center; gap: 8px; border: 2px solid transparent; background: var(--panel); }
+  .tab.on { border-color: var(--p); background: var(--panel-2); }
+  .tab .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--p); flex: none; }
+  .mine-list { display: flex; gap: 22px; flex-wrap: wrap; }
   .result { text-align: center; padding: 12px 0 4px; }
   .result .big { font-size: clamp(52px, 15vw, 88px); font-weight: 800; color: var(--gold); line-height: 1; letter-spacing: -0.03em; }
   .result .lbl { color: var(--muted); }
@@ -184,12 +189,10 @@ const twitchName = u => u?.user_metadata?.preferred_username || u?.user_metadata
 const avatar = u => u?.user_metadata?.avatar_url || u?.user_metadata?.picture || '';
 
 const hunt = () => state.hunts.find(x => x.id === state.huntId) || null;
-const isOpen = x => x && x.status === 'open' && (!x.closes_at || new Date(x.closes_at) > new Date());
-const resultOf = (x, p) => x[p.col];
-/* consoles concernées par une chasse (par défaut les deux) */
-const platsOf = x => PLATFORMS.filter(p => (x.platforms || ['switch', '3ds']).includes(p.key));
-const betsOf = p => state.bets.filter(b => b.platform === p.key);
-const myBet = p => betsOf(p).find(b => b.user_id === state.user?.id) || null;
+const platOf = x => PLATFORMS.find(p => p.key === x.platform) || PLATFORMS[0];
+const isOpen = x => x && x.status === 'open' && x.result == null && (!x.closes_at || new Date(x.closes_at) > new Date());
+const MAX_BETS = 2;
+const myBets = () => state.bets.filter(b => b.user_id === state.user?.id);
 
 /* ---------- données ---------- */
 async function loadHunts() {
@@ -220,30 +223,29 @@ function login() {
 }
 async function logout() { await sb.auth.signOut(); }
 
-async function placeBet(ev, p) {
+async function placeBet(ev) {
   ev.preventDefault();
-  const input = ev.target.elements.guess;
-  const guess = parseInt(input.value, 10);
+  const guess = parseInt(ev.target.elements.guess.value, 10);
   if (!Number.isInteger(guess) || guess < 1) return toast('Entre un nombre de rencontres supérieur à 0.', 'err');
-  const { error } = await sb.from('bets').insert({ hunt_id: state.huntId, platform: p.key, guess });
+  const { error } = await sb.from('bets').insert({ hunt_id: state.huntId, guess });
   if (error) {
-    if (error.code === '23505') toast('Tu as déjà parié sur la ' + p.label + ' pour cette chasse.', 'err');
-    else if (error.code === '42501') toast('Les paris sont fermés pour la ' + p.label + '.', 'err');
-    else toast('Erreur : ' + error.message, 'err');
+    const m = error.message || '';
+    if (m.includes('LIMITE_2_PARIS')) toast('Tu as déjà placé tes ' + MAX_BETS + ' paris sur cette chasse.', 'err');
+    else if (m.includes('PARI_DEJA_JOUE')) toast('Tu as déjà parié ce nombre. Choisis-en un autre.', 'err');
+    else if (error.code === '42501') toast('Les paris sont fermés pour cette chasse.', 'err');
+    else toast('Erreur : ' + m, 'err');
     return refresh();
   }
-  toast('Pari ' + p.label + ' enregistré. Bonne chance !');
+  toast('Pari enregistré. Bonne chance !');
   refresh();
 }
 
 async function createHunt(ev) {
   ev.preventDefault();
   const f = ev.target.elements;
-  const row = { title: f.title.value.trim(), pokemon: f.pokemon.value.trim() || null };
+  const row = { title: f.title.value.trim(), pokemon: f.pokemon.value.trim() || null, platform: f.platform.value };
   if (f.closes.value) row.closes_at = new Date(f.closes.value).toISOString();
-  row.platforms = PLATFORMS.filter(p => f['p_' + p.key].checked).map(p => p.key);
   if (!row.title) return toast('Donne un titre à la chasse.', 'err');
-  if (!row.platforms.length) return toast('Coche au moins une console (Switch ou 3DS).', 'err');
   const { data, error } = await sb.from('hunts').insert(row).select().single();
   if (error) return toast('Création impossible : ' + error.message, 'err');
   state.huntId = data.id; toast('Chasse créée.'); ev.target.reset(); refresh();
@@ -253,30 +255,23 @@ async function setStatus(status) {
   if (error) return toast(error.message, 'err');
   toast(status === 'open' ? 'Paris rouverts.' : 'Paris fermés.'); refresh();
 }
-async function finishPlatform(ev, p) {
+async function finishHunt(ev) {
   ev.preventDefault();
   const n = parseInt(ev.target.elements.result.value, 10);
   if (!Number.isInteger(n) || n < 1) return toast('Entre le nombre final de rencontres.', 'err');
-  if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final de la ' + p.label + ' ? Les paris ' + p.label + ' seront clos.')) return;
-  const cur = hunt();
-  const patch = { [p.col]: n };
-  // la chasse est terminée quand toutes ses consoles ont leur résultat
-  if (platsOf(cur).every(q => q.key === p.key || resultOf(cur, q) != null)) patch.status = 'finished';
-  const { error } = await sb.from('hunts').update(patch).eq('id', state.huntId);
+  if (!confirm('Valider ' + fmtNum(n) + ' rencontres comme résultat final ? Les paris seront clos.')) return;
+  const { error } = await sb.from('hunts').update({ result: n, status: 'finished' }).eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
-  toast('Résultat ' + p.label + ' enregistré, le classement est publié.'); refresh();
+  toast('Résultat enregistré, le classement est publié.'); refresh();
 }
-async function reopenResult(p) {
-  if (!confirm('Annuler le résultat de la ' + p.label + ' ?')) return;
-  const cur = hunt();
-  const patch = { [p.col]: null };
-  if (cur.status === 'finished') patch.status = 'closed';
-  const { error } = await sb.from('hunts').update(patch).eq('id', state.huntId);
+async function reopenResult() {
+  if (!confirm('Annuler le résultat et repasser la chasse en « paris fermés » ?')) return;
+  const { error } = await sb.from('hunts').update({ result: null, status: 'closed' }).eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   refresh();
 }
 async function deleteHunt() {
-  if (!confirm('Supprimer cette chasse et tous ses paris (Switch et 3DS) ? Action définitive.')) return;
+  if (!confirm('Supprimer cette chasse et tous ses paris ? Action définitive.')) return;
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   state.huntId = null; toast('Chasse supprimée.'); refresh();
@@ -315,58 +310,56 @@ function betRow(b, rank, result, maxDiff) {
     state.isAdmin && h('button', { class: 'danger', title: 'Supprimer ce pari', onclick: () => deleteBet(b.id) }, 'Suppr.'));
 }
 
-/* Une section complète pour une console : pari + résultat + liste/classement */
-function platformSection(cur, p) {
-  const result = resultOf(cur, p);
-  const done = result != null;
-  const open = isOpen(cur) && !done;
-  const bets = betsOf(p);
-  const mine = myBet(p);
+function huntSection(cur) {
+  const p = platOf(cur);
+  const done = cur.result != null;
+  const open = isOpen(cur);
+  const mine = myBets();
+  const left = MAX_BETS - mine.length;
+
+  const mineBlock = mine.length > 0 && h('div', {},
+    h('div', { class: 'hint' }, mine.length > 1 ? 'Tes paris' : 'Ton pari'),
+    h('div', { class: 'mine-list' }, mine.map(b => h('div', { class: 'mine' }, fmtNum(b.guess)))),
+    h('div', { class: 'hint' }, 'Enregistrés : impossible de les modifier ou de les supprimer.'));
 
   let top;
   if (done) {
     top = h('div', { class: 'result' },
       h('div', { class: 'lbl' }, 'Le shiny est tombé à'),
-      h('div', { class: 'big' }, fmtNum(result)),
+      h('div', { class: 'big' }, fmtNum(cur.result)),
       h('div', { class: 'lbl' }, 'rencontres sur ' + p.label));
-  } else if (mine) {
-    top = h('div', {},
-      h('div', { class: 'hint' }, 'Ton pari ' + p.label),
-      h('div', { class: 'mine' }, fmtNum(mine.guess)),
-      h('div', { class: 'hint' }, 'Il est enregistré et ne peut plus être modifié.'));
   } else if (!open) {
-    top = h('p', { class: 'empty' }, 'Les paris sont fermés pour la ' + p.label + '.');
+    top = h('div', {}, mineBlock, h('p', { class: 'empty' }, 'Les paris sont fermés pour cette chasse.'));
   } else if (!state.user) {
     top = h('div', {},
       h('p', {}, 'Connecte-toi avec ton compte Twitch pour parier. Ton pseudo est récupéré automatiquement.'),
       h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch'));
+  } else if (left > 0) {
+    top = h('div', {}, mineBlock,
+      h('form', { class: 'counter', onsubmit: placeBet },
+        h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres' }),
+        h('button', { class: 'gold', type: 'submit' }, 'Valider mon pari')),
+      h('div', { class: 'hint' }, 'Il te reste ' + left + (left > 1 ? ' paris' : ' pari') + ' sur ' + MAX_BETS + '. Un pari enregistré ne peut ni être modifié ni supprimé.'));
   } else {
-    top = h('div', {},
-      h('form', { class: 'counter', onsubmit: ev => placeBet(ev, p) },
-        h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres sur ' + p.label }),
-        h('button', { class: 'gold', type: 'submit' }, 'Parier sur la ' + p.label)),
-      h('div', { class: 'hint' }, 'Combien de rencontres avant le shiny sur ' + p.label + ' ? Un pari par console, impossible de le changer ensuite.'));
+    top = h('div', {}, mineBlock, h('div', { class: 'hint' }, 'Tu as placé tes ' + MAX_BETS + ' paris sur cette chasse.'));
   }
 
-  let sorted;
-  if (done) {
-    sorted = [...bets].sort((a, b) => Math.abs(a.guess - result) - Math.abs(b.guess - result) || new Date(a.created_at) - new Date(b.created_at));
-  } else {
-    sorted = [...bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }
-  const maxDiff = done && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - result) : 0;
+  const bets = state.bets;
+  const sorted = done
+    ? [...bets].sort((a, b) => Math.abs(a.guess - cur.result) - Math.abs(b.guess - cur.result) || new Date(a.created_at) - new Date(b.created_at))
+    : [...bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const maxDiff = done && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - cur.result) : 0;
 
   return h('section', { class: 'card plat', style: '--p:' + p.color },
     h('div', { class: 'plat-head' },
       h('h2', {}, 'Chasse ' + p.label),
-      h('span', { class: 'badge ' + (done ? 'finished' : open ? 'open' : '') },
-        done ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés')),
+      h('span', { class: 'badge ' + (done ? 'finished' : open ? 'open' : '') }, done ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés')),
     top,
-    h('h3', {}, (done ? 'Classement ' : 'Paris en cours ') + p.label + ' (' + bets.length + ')'),
+    h('h3', {}, (done ? 'Classement' : 'Paris en cours') + ' (' + bets.length + ')'),
     sorted.length
-      ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, done ? result : null, maxDiff)))
-      : h('p', { class: 'empty' }, 'Aucun pari ' + p.label + ' pour le moment. Sois le premier !'),
-    done && sorted.length > 1 && h('div', { class: 'hint' }, 'À égalité d’écart, le pari le plus ancien passe devant.'));
+      ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, done ? cur.result : null, maxDiff)))
+      : h('p', { class: 'empty' }, 'Aucun pari pour le moment. Sois le premier !'),
+    done && sorted.length > 1 && h('div', { class: 'hint' }, 'Chaque pari est classé séparément. À égalité d’écart, le plus ancien passe devant.'));
 }
 
 function adminPanel() {
@@ -378,22 +371,19 @@ function adminPanel() {
       h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
       h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
       h('div', { class: 'consoles' },
-        PLATFORMS.map(p => h('label', { class: 'chk' }, h('input', { type: 'checkbox', name: 'p_' + p.key, checked: true }), p.label))),
+        PLATFORMS.map((p, i) => h('label', { class: 'chk' }, h('input', { type: 'radio', name: 'platform', value: p.key, checked: i === 0 }), p.label))),
       h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
     cur && h('hr'),
     cur && cur.status !== 'finished' && h('div', { class: 'actions' },
       cur.status === 'open'
-        ? h('button', { onclick: () => setStatus('closed') }, 'Fermer tous les paris')
+        ? h('button', { onclick: () => setStatus('closed') }, 'Fermer les paris')
         : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
-    cur && platsOf(cur).map(p => {
-      const r = resultOf(cur, p);
-      return r != null
-        ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat ' + p.label + ' : '), h('strong', {}, fmtNum(r)),
-            h('button', { onclick: () => reopenResult(p) }, 'Annuler'))
-        : h('form', { onsubmit: ev => finishPlatform(ev, p) },
-            h('label', {}, 'Rencontres finales ' + p.label, h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
-            h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat ' + p.label));
-    }),
+    cur && (cur.result != null
+      ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat : '), h('strong', {}, fmtNum(cur.result)),
+          h('button', { onclick: reopenResult }, 'Annuler le résultat'))
+      : h('form', { onsubmit: finishHunt },
+          h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
+          h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat'))),
     cur && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse')));
 }
 
@@ -412,23 +402,18 @@ function render() {
     nodes.push(h('div', { class: 'card' }, h('h2', {}, 'Aucune chasse pour le moment'),
       h('p', { class: 'empty' }, state.isAdmin ? 'Crée la première chasse avec le panneau admin ci-dessous.' : 'Reviens bientôt, une chasse va démarrer.')));
   } else {
-    const finished = cur.status === 'finished';
+    if (state.hunts.length > 1) {
+      nodes.push(h('div', { class: 'tabs' }, state.hunts.map(x => h('button', {
+        class: 'tab' + (x.id === cur.id ? ' on' : ''), style: '--p:' + platOf(x).color,
+        onclick: async () => { state.huntId = x.id; await loadBets(); render(); } },
+        h('span', { class: 'dot' }), h('b', {}, platOf(x).label), ' ' + x.title))));
+    }
     const open = isOpen(cur);
-    const select = state.hunts.length > 1 && h('select', { class: 'hunt-select', 'aria-label': 'Choisir une chasse',
-      onchange: async e => { state.huntId = e.target.value; await loadBets(); render(); } },
-      state.hunts.map(x => h('option', { value: x.id, selected: x.id === cur.id }, x.title)));
-
     nodes.push(h('section', { class: 'card' },
-      h('div', { class: 'hunt-head' },
-        h('div', {},
-          h('h1', {}, cur.title),
-          h('div', { class: 'sub' }, [cur.pokemon, platsOf(cur).length > 1 ? 'Double chasse Switch + 3DS' : 'Chasse ' + platsOf(cur)[0].label, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – '))),
-        h('div', {}, h('span', { class: 'badge ' + (finished ? 'finished' : open ? 'open' : '') },
-          finished ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés'))),
-      cur.closes_at && !finished && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at)),
-      select && h('div', { style: 'margin-top:14px' }, select)));
-
-    platsOf(cur).forEach(p => nodes.push(platformSection(cur, p)));
+      h('h1', {}, cur.title),
+      h('div', { class: 'sub' }, [cur.pokemon, platOf(cur).label, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – ')),
+      cur.closes_at && cur.result == null && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at))));
+    nodes.push(huntSection(cur));
   }
 
   if (state.isAdmin) nodes.push(adminPanel());
