@@ -1,0 +1,26 @@
+# Secrets : ne JAMAIS commiter (clé secrète Supabase, client secret Twitch, etc.)
+.env
+.env.*
+*.pem
+*.key
+secrets*
+
+# Exports de données (paris, pseudos Twitch)
+*.csv
+*.sql.bak
+
+# Archives et sauvegardes
+*.zip
+*.bak
+*.log
+
+# Système et éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Dépendances locales éventuelles
+node_modules/
