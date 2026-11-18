@@ -380,10 +380,11 @@ function huntSection(cur) {
       h('h2', {}, 'Chasse ' + p.label),
       h('span', { class: 'badge ' + (done ? 'finished' : open ? 'open' : '') }, done ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés')),
     top,
-    h('h3', {}, (done ? 'Classement' : 'Paris en cours') + ' (' + bets.length + ')'),
-    sorted.length
-      ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, done ? cur.result : null, maxDiff)))
-      : h('p', { class: 'empty' }, 'Aucun pari pour le moment. Sois le premier !'),
+    done && h('h3', {}, 'Classement (' + bets.length + ')'),
+    done && (sorted.length
+      ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, cur.result, maxDiff)))
+      : h('p', { class: 'empty' }, 'Aucun pari sur cette chasse.')),
+    !done && h('div', { class: 'hint', style: 'margin-top:18px' }, 'Les paris des autres participants restent cachés jusqu’à la publication du résultat.'),
     done && sorted.length > 1 && h('div', { class: 'hint' }, 'Chaque pari est classé séparément. À égalité d’écart, le plus ancien passe devant.'));
 }
 
@@ -485,7 +486,7 @@ function render() {
     const open = isOpen(cur);
     nodes.push(h('section', { class: 'card' },
       h('h1', {}, cur.title),
-      h('div', { class: 'sub' }, [cur.pokemon, platOf(cur).label, state.bets.length + (state.bets.length > 1 ? ' paris' : ' pari')].filter(Boolean).join(' – ')),
+      h('div', { class: 'sub' }, [cur.pokemon, platOf(cur).label].filter(Boolean).join(' – ')),
       cur.closes_at && cur.result == null && h('div', { class: 'hint' }, (open ? 'Fermeture des paris : ' : 'Paris fermés depuis le ') + fmtDate(cur.closes_at))));
     nodes.push(huntSection(cur));
   }
