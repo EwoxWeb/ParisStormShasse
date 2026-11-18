@@ -80,6 +80,15 @@
   .hint { color: var(--muted); font-size: 14px; margin-top: 10px; }
   .mine { font-size: clamp(40px, 10vw, 56px); font-weight: 800; color: var(--gold); line-height: 1; margin: 8px 0 2px; }
 
+  .hunt-item { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--panel-2); padding: 12px 14px; }
+  .hunt-item .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--p); }
+  .hi-main { display: flex; flex-direction: column; min-width: 0; }
+  .hi-main small, .hi-meta { color: var(--muted); font-size: 14px; }
+  .back { margin-bottom: 14px; }
+  dl.info { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 14px 0 0; }
+  dl.info dt { color: var(--muted); }
+  dl.info dd { margin: 0; font-weight: 600; }
+  @media (max-width: 520px) { .hunt-item { grid-template-columns: 12px 1fr auto; } .hi-meta { display: none; } }
   .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .tab { display: flex; align-items: center; gap: 8px; border: 2px solid transparent; background: var(--panel); }
   .tab.on { border-color: var(--p); background: var(--panel-2); }
@@ -160,7 +169,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [] };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], view: 'public', adminHuntId: null, counts: {} };
 
 /* ---------- petits utilitaires (aucun innerHTML avec des données utilisateur) ---------- */
 function h(tag, attrs, ...kids) {
@@ -215,7 +224,22 @@ async function loadAdmin() {
   const { data } = await sb.from('admins').select('user_id').eq('user_id', state.user.id).maybeSingle();
   state.isAdmin = !!data;
 }
-async function refresh() { await loadHunts(); await loadBets(); render(); }
+async function loadCounts() {
+  const { data } = await sb.from('bets').select('hunt_id');
+  state.counts = {};
+  (data || []).forEach(r => { state.counts[r.hunt_id] = (state.counts[r.hunt_id] || 0) + 1; });
+}
+async function refresh() { await loadHunts(); await loadBets(); if (state.view === 'admin') await loadCounts(); render(); }
+
+/* navigation du panel admin */
+async function toggleAdmin() {
+  state.view = state.view === 'admin' ? 'public' : 'admin';
+  state.adminHuntId = null;
+  if (state.view === 'admin') await loadCounts();
+  render();
+}
+async function openAdminHunt(id) { state.adminHuntId = id; state.huntId = id; await loadBets(); render(); }
+async function closeAdminHunt() { state.adminHuntId = null; await loadCounts(); render(); }
 
 /* ---------- actions ---------- */
 function login() {
@@ -274,7 +298,7 @@ async function deleteHunt() {
   if (!confirm('Supprimer cette chasse et tous ses paris ? Action définitive.')) return;
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
-  state.huntId = null; toast('Chasse supprimée.'); refresh();
+  state.huntId = null; state.adminHuntId = null; toast('Chasse supprimée.'); refresh();
 }
 async function deleteBet(id) {
   if (!confirm('Supprimer ce pari ?')) return;
@@ -290,6 +314,7 @@ function renderAuth() {
     $auth.append(h('div', { class: 'me' },
       avatar(state.user) && h('img', { src: avatar(state.user), alt: '' }),
       h('span', {}, twitchName(state.user)),
+      state.isAdmin && h('button', { class: 'gold', onclick: toggleAdmin }, state.view === 'admin' ? 'Retour au site' : 'Admin'),
       h('button', { onclick: logout }, 'Se déconnecter')));
   } else if (configured) {
     $auth.append(h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch'));
@@ -362,29 +387,77 @@ function huntSection(cur) {
     done && sorted.length > 1 && h('div', { class: 'hint' }, 'Chaque pari est classé séparément. À égalité d’écart, le plus ancien passe devant.'));
 }
 
-function adminPanel() {
-  const cur = hunt();
-  return h('section', { class: 'card admin' },
-    h('h2', {}, 'Panneau admin'),
-    h('form', { onsubmit: createHunt },
-      h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
-      h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
-      h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
-      h('div', { class: 'consoles' },
-        PLATFORMS.map((p, i) => h('label', { class: 'chk' }, h('input', { type: 'radio', name: 'platform', value: p.key, checked: i === 0 }), p.label))),
-      h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse')),
-    cur && h('hr'),
-    cur && cur.status !== 'finished' && h('div', { class: 'actions' },
-      cur.status === 'open'
-        ? h('button', { onclick: () => setStatus('closed') }, 'Fermer les paris')
-        : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
-    cur && (cur.result != null
-      ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat : '), h('strong', {}, fmtNum(cur.result)),
-          h('button', { onclick: reopenResult }, 'Annuler le résultat'))
-      : h('form', { onsubmit: finishHunt },
-          h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
-          h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat'))),
-    cur && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse')));
+function createForm() {
+  return h('form', { onsubmit: createHunt },
+    h('label', {}, 'Titre', h('input', { name: 'title', maxlength: 80, placeholder: 'Chasse Dracaufeu', required: true })),
+    h('label', {}, 'Pokémon', h('input', { name: 'pokemon', maxlength: 40, placeholder: 'Dracaufeu' })),
+    h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
+    h('div', { class: 'consoles' },
+      PLATFORMS.map((p, i) => h('label', { class: 'chk' }, h('input', { type: 'radio', name: 'platform', value: p.key, checked: i === 0 }), p.label))),
+    h('button', { class: 'gold', type: 'submit' }, 'Créer la chasse'));
+}
+const statusLabel = x => x.status === 'finished' ? 'Terminée' : isOpen(x) ? 'Ouverte' : 'Fermée';
+const statusClass = x => x.status === 'finished' ? 'finished' : isOpen(x) ? 'open' : '';
+
+function adminList() {
+  return h('div', {},
+    h('section', { class: 'card admin' },
+      h('h2', {}, 'Chasses'),
+      state.hunts.length
+        ? h('div', { class: 'list' }, state.hunts.map(x => {
+            const p = platOf(x);
+            return h('button', { class: 'hunt-item', style: '--p:' + p.color, onclick: () => openAdminHunt(x.id) },
+              h('span', { class: 'dot' }),
+              h('span', { class: 'hi-main' }, h('b', {}, x.title), h('small', {}, [p.label, x.pokemon].filter(Boolean).join(' – '))),
+              h('span', { class: 'hi-meta' }, (state.counts[x.id] || 0) + ' paris' + (x.result != null ? ' – résultat ' + fmtNum(x.result) : '')),
+              h('span', { class: 'badge ' + statusClass(x) }, statusLabel(x)));
+          }))
+        : h('p', { class: 'empty' }, 'Aucune chasse pour le moment.')),
+    h('section', { class: 'card admin' }, h('h2', {}, 'Nouvelle chasse'), createForm()));
+}
+
+function adminDetail(cur) {
+  const p = platOf(cur);
+  const done = cur.result != null;
+  const sorted = done
+    ? [...state.bets].sort((a, b) => Math.abs(a.guess - cur.result) - Math.abs(b.guess - cur.result) || new Date(a.created_at) - new Date(b.created_at))
+    : [...state.bets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const maxDiff = done && sorted.length ? Math.abs(sorted[sorted.length - 1].guess - cur.result) : 0;
+  const info = (k, v) => [h('dt', {}, k), h('dd', {}, v)];
+
+  return h('div', {},
+    h('button', { class: 'back', onclick: closeAdminHunt }, '← Toutes les chasses'),
+    h('section', { class: 'card plat', style: '--p:' + p.color },
+      h('div', { class: 'plat-head' }, h('h2', {}, cur.title), h('span', { class: 'badge ' + statusClass(cur) }, statusLabel(cur))),
+      h('dl', { class: 'info' },
+        info('Console', p.label), info('Pokémon', cur.pokemon || '—'),
+        info('Créée le', fmtDate(cur.created_at)),
+        info('Fermeture auto', cur.closes_at ? fmtDate(cur.closes_at) : 'Aucune'),
+        info('Résultat', done ? fmtNum(cur.result) + ' rencontres' : 'Pas encore saisi'),
+        info('Paris', String(state.bets.length)))),
+    h('section', { class: 'card admin' },
+      h('h2', {}, 'Actions'),
+      cur.status !== 'finished' && h('div', { class: 'actions' },
+        cur.status === 'open'
+          ? h('button', { onclick: () => setStatus('closed') }, 'Fermer les paris')
+          : h('button', { onclick: () => setStatus('open') }, 'Rouvrir les paris')),
+      done
+        ? h('div', { class: 'res-line' }, h('span', {}, 'Résultat : '), h('strong', {}, fmtNum(cur.result)),
+            h('button', { onclick: reopenResult }, 'Annuler le résultat'))
+        : h('form', { onsubmit: finishHunt },
+            h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
+            h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat')),
+      h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette chasse'))),
+    h('section', { class: 'card' },
+      h('h2', {}, (done ? 'Classement' : 'Paris') + ' (' + sorted.length + ')'),
+      sorted.length
+        ? h('div', { class: 'list' }, sorted.map((b, i) => betRow(b, i + 1, done ? cur.result : null, maxDiff)))
+        : h('p', { class: 'empty' }, 'Aucun pari sur cette chasse.')));
+}
+
+function adminView() {
+  const cur = state.adminHuntId ? state.hunts.find(x => x.id === state.adminHuntId) : null;
+  return cur ? adminDetail(cur) : adminList();
 }
 
 function render() {
@@ -395,12 +468,13 @@ function render() {
       h('p', { class: 'setup' }, 'Renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du script de index.html (voir le README).')));
     return;
   }
+  if (state.view === 'admin' && state.isAdmin) { $app.replaceChildren(adminView()); return; }
   const cur = hunt();
   const nodes = [];
 
   if (!cur) {
     nodes.push(h('div', { class: 'card' }, h('h2', {}, 'Aucune chasse pour le moment'),
-      h('p', { class: 'empty' }, state.isAdmin ? 'Crée la première chasse avec le panneau admin ci-dessous.' : 'Reviens bientôt, une chasse va démarrer.')));
+      h('p', { class: 'empty' }, state.isAdmin ? 'Crée la première chasse depuis le bouton Admin.' : 'Reviens bientôt, une chasse va démarrer.')));
   } else {
     if (state.hunts.length > 1) {
       nodes.push(h('div', { class: 'tabs' }, state.hunts.map(x => h('button', {
@@ -416,7 +490,6 @@ function render() {
     nodes.push(huntSection(cur));
   }
 
-  if (state.isAdmin) nodes.push(adminPanel());
   $app.replaceChildren(...nodes);
 }
 
