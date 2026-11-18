@@ -8,8 +8,16 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Tout le site (HTML, CSS, JS) |
-| `supabase/schema.sql` | Tables et règles de sécurité à coller dans Supabase |
+| `index.html`, `style.css`, `app.js` | Le site (aucun script ni style inline, pour une CSP stricte) |
+| `config.js` | **Seul fichier à modifier** : URL du projet Supabase et clé publique |
+| `lib/` | supabase-js 2.45.4 hébergé localement (aucun CDN externe) |
+| `SECURITY.md` | Checklist sécurité et tests d'attaque |
+| `supabase/migration-v6-securite.sql` | Durcissement sécurité (à lancer après la v5) |
+| `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
+| `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
+| `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
+| `supabase/migration-v5-paris-caches.sql` | Les joueurs ne voient que leurs propres paris jusqu'au résultat |
+| `supabase/migration-v2-switch-3ds.sql` | À lancer une fois si ta base existait avant la double chasse |
 | `.github/workflows/keepalive.yml` | Ping quotidien pour que Supabase ne mette pas le projet en pause |
 
 ## Mise en place
@@ -30,7 +38,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 
 ### 3. Mettre le site en ligne sur GitHub Pages
 
-1. Dans `index.html`, remplace `SUPABASE_URL` et `SUPABASE_ANON_KEY` (haut du script).
+1. Dans `config.js`, remplace `SUPABASE_URL` et `SUPABASE_ANON_KEY` (clé publique uniquement). Si tu changes de projet Supabase, mets aussi à jour l'URL dans la balise CSP de `index.html`.
    La clé anon est publique par conception : la sécurité vient des règles RLS du `schema.sql`.
 2. Crée un dépôt GitHub, pousse les fichiers (y compris le dossier `.github`).
 3. **Settings > Pages** : source = *Deploy from a branch*, branche `main`, dossier `/ (root)`.
@@ -46,10 +54,9 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 
 ```sql
 insert into public.admins (user_id)
-select id from auth.users
-where lower(coalesce(raw_user_meta_data->>'preferred_username',
-                     raw_user_meta_data->>'user_name',
-                     raw_user_meta_data->>'name')) = 'ton_pseudo_twitch';
+select i.user_id from auth.identities i
+where i.provider = 'twitch'
+  and lower(coalesce(i.identity_data->>'preferred_username', i.identity_data->>'user_name', i.identity_data->>'name')) = 'ton_pseudo_twitch';
 ```
 
 3. Recharge le site : le **panneau admin** apparaît en bas de page.
@@ -63,6 +70,15 @@ Dans ton dépôt GitHub : **Settings > Secrets and variables > Actions**, ajoute
 
 Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à la main dans l'onglet **Actions > Supabase keep-alive > Run workflow**.
 
+## Switch, 3DS et 2 paris par chasse
+
+- Une chasse = **une seule console** : tu la choisis (Switch ou 3DS) à la création. Pour une double chasse, tu crées deux chasses, une par console. Les viewers passent de l'une à l'autre avec les onglets en haut de page.
+- Chaque viewer peut placer **2 paris par chasse** (deux nombres différents).
+- Un pari enregistré ne peut **ni être modifié ni être supprimé** par son auteur. Seul un admin peut supprimer un pari (modération).
+- Le résultat se saisit par chasse : le classement s'affiche et les paris se ferment.
+
+**Si ta base existait déjà**, lance dans l'ordre les migrations v2, v3 puis `supabase/migration-v4-une-console-deux-paris.sql` (une seule fois chacune). La v4 sépare automatiquement les anciennes doubles chasses en deux chasses.
+
 ## Utilisation
 
 **Admin** (panneau en bas de page)
@@ -71,15 +87,15 @@ Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à 
 3. Quand le shiny tombe, saisir le nombre final de rencontres. Le classement s'affiche pour tout le monde.
 
 **Viewers**
-1. Connexion Twitch, saisie du nombre, un seul pari par compte, non modifiable.
+1. Connexion Twitch, saisie du nombre pour chaque console, un pari par compte et par console, non modifiable.
 
 ## Sécurité
 
 - Le pseudo est lu côté serveur dans le compte Twitch connecté (trigger SQL). Il ne peut pas être falsifié depuis le navigateur.
-- Un seul pari par compte et par chasse (contrainte unique en base).
+- 2 paris maximum par compte et par chasse, jamais deux fois le même nombre (vérifié en base).
 - Les paris ne sont acceptés que si la chasse est ouverte et avant l'heure de fermeture : c'est la base qui vérifie, pas le site.
 - Seuls les admins peuvent créer ou modifier une chasse, saisir le résultat et supprimer un pari.
-- Les paris sont visibles par tous en direct. Pour les cacher jusqu'à la clôture (contre le copier-coller), un bloc de remplacement est fourni en commentaire dans `schema.sql`.
+- **Paris cachés** : chaque joueur ne voit que ses propres paris, les admins voient tout. Les paris de tout le monde ne deviennent visibles qu'une fois le résultat publié (pour le classement). C'est la base de données qui l'impose (`migration-v5-paris-caches.sql`), pas seulement le site.
 
 ## Règles de classement
 

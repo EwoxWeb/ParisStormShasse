@@ -14,7 +14,7 @@
 | Se faire passer pour admin | Table `admins` modifiable uniquement depuis le SQL Editor ; l'interface admin n'est qu'un affichage, la vraie barrière est le RLS. |
 | Comptes bidon (email, anonyme) | Seuls les comptes avec une identité Twitch peuvent parier (`COMPTE_TWITCH_REQUIS`). |
 | Injection de script (XSS) | Aucun `innerHTML`, aucun script inline, CSP stricte, avatars limités au CDN Twitch. |
-| Script CDN piégé (supply chain) | supabase-js est hébergé dans `vendor/` : plus aucun script externe. |
+| Script CDN piégé (supply chain) | supabase-js est hébergé dans `lib/` : plus aucun script externe. |
 | Clickjacking | Le site refuse de s'afficher dans une iframe. |
 | Actions admin douteuses | Journal `audit_log` (qui, quand, quoi), lisible par les admins seulement. |
 

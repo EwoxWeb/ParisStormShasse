@@ -348,6 +348,11 @@ function render() {
 /* ---------- démarrage ---------- */
 async function start() {
   if (!configured) return render();
+  if (!window.supabase) {
+    $app.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Erreur de chargement'),
+      h('p', { class: 'setup' }, 'La bibliothèque supabase-js est introuvable : le dossier lib/ n’a pas été publié sur GitHub.')));
+    return;
+  }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data } = await sb.auth.getSession();
   state.user = data.session?.user || null;
