@@ -1,4 +1,3 @@
-
 /* Anti-clickjacking : le site refuse de s'afficher dans une iframe */
 if (window.top !== window.self) { document.documentElement.textContent = ''; throw new Error('framed'); }
 
@@ -18,6 +17,16 @@ const PLATFORMS = [
 
 let sb = null;
 const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', view: 'public', adminHuntId: null, counts: {} };
+
+/* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
+const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
+const TAB_TO_HASH = { switch: 'sw', '3ds': 'ds' };
+const tabFromHash = () => HASH_TO_TAB[location.hash.replace(/^#/, '').toLowerCase()] || null;
+function takeSavedTab() {   // onglet mémorisé avant la connexion Twitch (la redirection fait perdre le #)
+  try { const t = sessionStorage.getItem('tab'); sessionStorage.removeItem('tab'); return t === 'switch' || t === '3ds' ? t : null; }
+  catch { return null; }
+}
+function onHash() { const t = tabFromHash(); if (t && t !== state.tab) { state.tab = t; render(); } }
 
 /* ---------- petits utilitaires (aucun innerHTML avec des données utilisateur) ---------- */
 function h(tag, attrs, ...kids) {
@@ -92,6 +101,7 @@ async function closeAdminHunt() { state.adminHuntId = null; await loadCounts(); 
 
 /* ---------- actions ---------- */
 function login() {
+  try { sessionStorage.setItem('tab', state.tab); } catch {}
   sb.auth.signInWithOAuth({ provider: 'twitch', options: { redirectTo: location.origin + location.pathname } });
 }
 async function logout() { await sb.auth.signOut(); }
@@ -333,7 +343,7 @@ function render() {
     const n = state.hunts.filter(x => x.platform === p.key && isOpen(x)).length;
     return h('button', { class: 'tab' + (p.key === state.tab ? ' on' : ''), role: 'tab',
       'aria-selected': p.key === state.tab ? 'true' : 'false', style: '--p:' + p.color,
-      onclick: () => { state.tab = p.key; render(); } },
+      onclick: () => { state.tab = p.key; history.replaceState(null, '', '#' + TAB_TO_HASH[p.key]); render(); } },
       h('span', { class: 'dot' }), h('b', {}, p.label),
       n > 0 && h('span', { class: 'badge open' }, n + (n > 1 ? ' ouvertes' : ' ouverte')));
   }))];
@@ -356,6 +366,8 @@ async function start() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data } = await sb.auth.getSession();
   state.user = data.session?.user || null;
+  state.tab = tabFromHash() || takeSavedTab() || state.tab;   // après getSession : le # de connexion est déjà traité
+  window.addEventListener('hashchange', onHash);
   await loadAdmin();
   await refresh();
   sb.auth.onAuthStateChange(async (_evt, session) => {
