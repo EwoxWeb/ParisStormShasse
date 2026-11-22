@@ -13,6 +13,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 | `lib/` | supabase-js 2.45.4 hébergé localement (aucun CDN externe) |
 | `SECURITY.md` | Checklist sécurité et tests d'attaque |
 | `supabase/migration-v6-securite.sql` | Durcissement sécurité (à lancer après la v5) |
+| `supabase/migration-v7-joueurs-manuels.sql` | Paris ajoutés à la main + fusion avec les comptes Twitch (après la v6) |
 | `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
 | `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
 | `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
@@ -78,6 +79,13 @@ Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à 
 - Le résultat se saisit par chasse : le classement s'affiche et les paris se ferment.
 
 **Si ta base existait déjà**, lance dans l'ordre les migrations v2, v3 puis `supabase/migration-v4-une-console-deux-paris.sql` (une seule fois chacune). La v4 sépare automatiquement les anciennes doubles chasses en deux chasses.
+
+## Liens directs (commandes du chat)
+
+- `https://ewoxweb.github.io/ParisStormShasse/#sw` ouvre directement l'onglet **Switch** (commande `!sw`)
+- `https://ewoxweb.github.io/ParisStormShasse/#ds` ouvre directement l'onglet **3DS** (commande `!ds`)
+
+Le lien est à mettre dans la réponse des commandes de ton bot Twitch. Après la connexion Twitch, le viewer revient sur l'onglet d'où il est parti.
 
 ## Utilisation
 

@@ -2,7 +2,7 @@
 --  Paris Shiny — schéma complet (INSTALLATION NEUVE uniquement)
 --  Une chasse = une console (Switch ou 3DS), 2 paris max par compte et par chasse.
 --  Si ta base existe déjà, utilise les fichiers migration-*.sql à la place.
---  Installation neuve : lance ce fichier, PUIS supabase/migration-v6-securite.sql (sécurité).
+--  Installation neuve : lance ce fichier, PUIS migration-v6-securite.sql, PUIS migration-v7-joueurs-manuels.sql.
 -- =====================================================================
 
 create table public.hunts (
