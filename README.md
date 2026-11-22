@@ -15,6 +15,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 | `supabase/migration-v6-securite.sql` | Durcissement sécurité (à lancer après la v5) |
 | `supabase/migration-v7-joueurs-manuels.sql` | Paris ajoutés à la main + fusion avec les comptes Twitch (après la v6) |
 | `supabase/migration-v8-images.sql` | Image ou GIF du Pokémon sur chaque shasse (après la v7) |
+| `supabase/migration-v9-classement-saison.sql` | Date des résultats pour le classement automatique de la Saison 2 (après la v8) |
 | `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
 | `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
 | `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
@@ -79,7 +80,7 @@ Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à 
 - Un pari enregistré ne peut **ni être modifié ni être supprimé** par son auteur. Seul un admin peut supprimer un pari (modération).
 - Le résultat se saisit par chasse : le classement s'affiche et les paris se ferment.
 
-**Si ta base existait déjà**, lance dans l'ordre les migrations v2, v3 puis `supabase/migration-v4-une-console-deux-paris.sql` (une seule fois chacune). La v4 sépare automatiquement les anciennes doubles chasses en deux chasses.
+**Si ta base existait déjà**, lance les migrations manquantes dans l'ordre. Pour activer le classement automatique, lance aussi `supabase/migration-v9-classement-saison.sql` après la v8 (une seule fois). Les résultats existants ne sont pas recomptés ; toute shasse terminée à partir de maintenant, y compris une shasse déjà en cours, sera prise en compte.
 
 ## Liens directs (commandes du chat)
 
@@ -108,6 +109,8 @@ Le lien est à mettre dans la réponse des commandes de ton bot Twitch. Après l
 
 ## Règles de classement
 
+- Le classement de la Saison 2 commence avec les scores fournis : Finity (10), Dylho (9), Pokemaz (5) et Ewox (2). Les points de chaque nouvelle shasse terminée sont ajoutés automatiquement.
+- Barème : nombre pile = 5 points ; 1er = 3 points ; 2ème = 2 points ; 3ème = 1 point.
 - Écart = valeur absolue entre le pari et le résultat.
 - À écart égal, le pari **le plus ancien** passe devant.
 

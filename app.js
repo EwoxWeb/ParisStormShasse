@@ -8,6 +8,7 @@ const configured = !!SUPABASE_URL && !!SUPABASE_ANON_KEY
 
 const $app = document.getElementById('app');
 const $auth = document.getElementById('auth');
+const $nav = document.getElementById('site-nav');
 const $toast = document.getElementById('toast');
 
 /* Les deux consoles de la double shasse */
@@ -17,17 +18,23 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts' };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts' };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
 const TAB_TO_HASH = { switch: 'sw', '3ds': 'ds' };
 const tabFromHash = () => HASH_TO_TAB[location.hash.replace(/^#/, '').toLowerCase()] || null;
+const pageFromHash = () => ({ rules: 'rules', classement: 'leaderboard' }[location.hash.replace(/^#/, '').toLowerCase()] || 'bets');
 function takeSavedTab() {   // onglet mémorisé avant la connexion Twitch (la redirection fait perdre le #)
   try { const t = sessionStorage.getItem('tab'); sessionStorage.removeItem('tab'); return t === 'switch' || t === '3ds' ? t : null; }
   catch { return null; }
 }
-function onHash() { const t = tabFromHash(); if (t && t !== state.tab) { state.tab = t; render(); } }
+function onHash() {
+  state.page = pageFromHash();
+  const t = tabFromHash();
+  if (t) state.tab = t;
+  render();
+}
 
 /* ---------- petits utilitaires (aucun innerHTML avec des données utilisateur) ---------- */
 function h(tag, attrs, ...kids) {
@@ -268,6 +275,13 @@ function renderAuth() {
 
 /* ----- classement : une ligne par joueur (ses 2 paris), points ----- */
 const keyOf = b => b.user_id || ('m:' + b.manual_player_id);
+const SEASON_START_AT = '2026-11-22T17:03:13.148Z';
+const SEASON_BASELINE = [
+  { name: 'Finity', points: 10 },
+  { name: 'Dylho', points: 9 },
+  { name: 'Pokemaz', points: 5 },
+  { name: 'Ewox', points: 2 },
+];
 function groupPlayers(bets, result) {
   const map = new Map();
   for (const b of bets) {
@@ -290,6 +304,70 @@ function groupPlayers(bets, result) {
 }
 /* barème : nombre pile = 5 pts, 1er = 3, 2e = 2, 3e = 1 */
 const pointsFor = (p, rank) => p.diff === 0 ? 5 : ({ 1: 3, 2: 2, 3: 1 }[rank] || 0);
+
+function seasonRanking() {
+  const players = new Map(SEASON_BASELINE.map(p => [p.name.toLocaleLowerCase('fr'), { ...p }]));
+  for (const cur of state.hunts) {
+    if (cur.result == null || !cur.result_at || new Date(cur.result_at) < new Date(SEASON_START_AT)) continue;
+    const bets = betsOfHunt(cur.id);
+    const ranked = groupPlayers(bets, cur.result);
+    ranked.forEach((p, i) => {
+      const key = p.name.toLocaleLowerCase('fr');
+      const current = players.get(key) || { name: p.name, points: 0 };
+      current.points += pointsFor(p, i + 1);
+      players.set(key, current);
+    });
+  }
+  return [...players.values()].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'fr'));
+}
+
+function rulesPage() {
+  return h('article', { class: 'card info-page' },
+    h('h1', {}, 'Fonctionnement des paris chez NovaStorm'),
+    h('p', {}, 'Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.'),
+    h('h2', {}, 'Comment parier ?'),
+    h('p', {}, 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.'),
+    h('p', {}, 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après.'),
+    h('p', {}, 'Clique sur “envoyer” et voilà ! Ton pari est enregistré !'),
+    h('p', {}, h('strong', {}, 'Nouveauté : '), 'Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.'),
+    h('h2', {}, 'Mais… à quoi ça sert ?'),
+    h('p', {}, 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour voir ces récompenses, écris “!top” dans le chat ou clique ',
+      h('a', { href: 'https://docs.google.com/document/u/0/d/1XN9aWvAgVw9cHRZd02qC-rSGpfOxesOocgcTTXI9ppk/edit', target: '_blank', rel: 'noopener noreferrer' }, 'ici'), '.'),
+    h('p', {}, 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !'));
+}
+
+function leaderboardPage() {
+  const players = seasonRanking();
+  const winner = players.find(p => p.points >= 35);
+  return h('div', {},
+    h('section', { class: 'card info-page' },
+      h('h1', {}, 'Classement des paris — Saison 2'),
+      h('p', {}, 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !'),
+      h('p', { class: 'notice' }, h('strong', {}, 'NOUVEAU : '), 'Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.'),
+      h('h2', {}, 'Récompenses pour les 6 premiers'),
+      h('ol', { class: 'rewards' },
+        ['Un grade VIP à vie sur la chaîne.',
+          'Un sub offert (1 mois).',
+          'Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).',
+          'Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).',
+          'Une carte cadeau Nintendo de 10 €.',
+          'Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable).'].map(text => h('li', {}, text))),
+      h('h2', {}, 'Attribution des points'),
+      h('ul', { class: 'points-list' },
+        ['Nombre pile = 5 points', '1er = 3 points', '2ème = 2 points', '3ème = 1 point'].map(text => h('li', {}, text))),
+      h('p', { class: 'hint' }, 'Utilise la commande Ctrl+F puis tape ton pseudo pour te trouver dans la liste !')),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Classement'),
+      winner && h('p', { class: 'notice' }, 'Seuil des 35 points atteint par ', h('strong', {}, winner.name), ' (', winner.points, ' points) !'),
+      players.length
+        ? h('div', { class: 'standings' }, players.map((p, i) =>
+            h('div', { class: 'standing' },
+              h('span', { class: 'standing-rank' }, i + 1),
+              h('span', { class: 'standing-name' }, p.name),
+              h('span', { class: 'standing-points' }, p.points + ' pts'))))
+        : h('p', { class: 'empty' }, 'Le classement sera actualisé après les prochains résultats.'),
+      h('p', { class: 'hint' }, 'Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement.')));
+}
 
 function playerRow(p, rank, result, maxDiff) {
   const done = result != null;
@@ -482,6 +560,13 @@ function adminView() {
 
 function render() {
   renderAuth();
+  for (const link of $nav.querySelectorAll('a')) {
+    const page = pageFromHashForNav(link.hash);
+    if (page === state.page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  if (state.page === 'rules') { $app.replaceChildren(rulesPage()); return; }
+  if (state.page === 'leaderboard') { $app.replaceChildren(leaderboardPage()); return; }
   if (!configured) {
     $app.replaceChildren(h('div', { class: 'card' },
       h('h2', {}, 'Configuration manquante'),
@@ -507,9 +592,15 @@ function render() {
   list.forEach(x => nodes.push(huntSection(x)));
   $app.replaceChildren(...nodes);
 }
+function pageFromHashForNav(hash) {
+  const value = hash.replace(/^#/, '').toLowerCase();
+  return value === 'rules' ? 'rules' : value === 'classement' ? 'leaderboard' : 'bets';
+}
 
 /* ---------- démarrage ---------- */
 async function start() {
+  state.page = pageFromHash();
+  window.addEventListener('hashchange', onHash);
   if (!configured) return render();
   if (!window.supabase) {
     $app.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Erreur de chargement'),
@@ -519,8 +610,8 @@ async function start() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data } = await sb.auth.getSession();
   state.user = data.session?.user || null;
+  state.page = pageFromHash();
   state.tab = tabFromHash() || takeSavedTab() || state.tab;   // après getSession : le # de connexion est déjà traité
-  window.addEventListener('hashchange', onHash);
   await loadAdmin();
   await refresh();
   sb.auth.onAuthStateChange(async (_evt, session) => {

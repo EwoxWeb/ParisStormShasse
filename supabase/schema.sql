@@ -13,9 +13,31 @@ create table public.hunts (
   status      text not null default 'open' check (status in ('open', 'closed', 'finished')),
   closes_at   timestamptz,
   result      integer check (result > 0),
+  result_at   timestamptz,
   created_at  timestamptz not null default now(),
   check (status <> 'finished' or result is not null)
 );
+
+create or replace function public.set_hunt_result_at()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.status = 'finished' and new.result is not null then
+    if tg_op = 'INSERT' then
+      new.result_at := now();
+    elsif old.status <> 'finished' or old.result is distinct from new.result then
+      new.result_at := now();
+    else
+      new.result_at := old.result_at;
+    end if;
+  else
+    new.result_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger hunts_set_result_at before insert or update on public.hunts
+  for each row execute function public.set_hunt_result_at();
 
 create table public.admins (
   user_id uuid primary key references auth.users (id) on delete cascade

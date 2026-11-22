@@ -24,6 +24,9 @@
   .brand { font-weight: 800; font-size: 26px; letter-spacing: -0.02em; }
     .me { display: flex; align-items: center; gap: 10px; font-weight: 600; flex-wrap: wrap; }
   .me img { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--edge); }
+  .site-nav { display: flex; gap: 10px; flex-wrap: wrap; margin: -10px 0 24px; }
+  .site-nav a { color: var(--text); background: var(--card); border: 2px solid var(--edge); border-radius: 8px; padding: 8px 14px; font-weight: 700; text-decoration: none; box-shadow: 2px 2px 0 var(--shadow); }
+  .site-nav a:hover, .site-nav a[aria-current="page"] { background: var(--gold); color: var(--gold-ink); }
 
   button, select, input { font: inherit; color: inherit; }
   button { border: 2px solid var(--edge); border-radius: 8px; padding: 9px 16px; font-weight: 600; cursor: pointer;
@@ -113,6 +116,19 @@
   dl.info { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 14px 0 0; }
   dl.info dt { color: var(--muted); }
   dl.info dd { margin: 0; font-weight: 500; }
+  .info-page h1 { font-size: clamp(24px, 6vw, 32px); line-height: 1.15; margin: 0 0 18px; font-weight: 800; }
+  .info-page h2 { margin-top: 26px; }
+  .info-page p { margin: 12px 0; }
+  .info-page a { color: var(--twitch); font-weight: 700; }
+  .notice { padding: 12px 14px; border-left: 5px solid var(--gold); background: var(--soft); border-radius: 6px; }
+  .rewards, .points-list { padding-left: 24px; }
+  .rewards li, .points-list li { padding: 3px 0; }
+  .standings { display: flex; flex-direction: column; border: 2px solid var(--edge); border-radius: 10px; overflow: hidden; }
+  .standing { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 11px 14px; background: var(--card); border-bottom: 1px solid var(--soft); }
+  .standing:last-child { border-bottom: 0; }
+  .standing-rank { color: var(--muted); text-align: center; font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; }
+  .standing-name { font-weight: 700; overflow-wrap: anywhere; }
+  .standing-points { font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
 
   #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--text); color: var(--bg); border: 2px solid var(--text);
     padding: 12px 18px; border-radius: 10px; max-width: 90vw; z-index: 10; display: none; font-weight: 600; box-shadow: 4px 4px 0 var(--shadow); }
