@@ -18,7 +18,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts' };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -95,7 +95,17 @@ async function loadCounts() {
   state.counts = {};
   (data || []).forEach(r => { state.counts[r.hunt_id] = (state.counts[r.hunt_id] || 0) + 1; });
 }
-async function refresh() { await loadHunts(); await loadBets(); if (state.view === 'admin') await loadCounts(); render(); }
+async function loadSiteContent() {
+  const { data, error } = await sb.from('site_content').select('rules, leaderboard').eq('id', 1).maybeSingle();
+  if (error) {
+    if (!state.siteContentErrorShown) toast('Chargement du contenu admin impossible : ' + error.message + ' (vérifie la migration v10).', 'err');
+    state.siteContentErrorShown = true;
+    return;
+  }
+  state.siteContentErrorShown = false;
+  if (data) state.siteContent = { rules: { ...DEFAULT_RULES, ...data.rules }, leaderboard: validBaseline(data.leaderboard) };
+}
+async function refresh() { await loadHunts(); await loadBets(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
 
 /* navigation du panel admin */
 async function toggleAdmin() {
@@ -282,6 +292,22 @@ const SEASON_BASELINE = [
   { name: 'Pokemaz', points: 5 },
   { name: 'Ewox', points: 2 },
 ];
+const DEFAULT_RULES = {
+  intro: 'Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.',
+  commands: 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.',
+  form: 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après. Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !',
+  foxier: 'Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.',
+  purpose: 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour les voir, écris “!top” dans le chat.',
+  rewardsUrl: 'https://ewoxweb.github.io/ParisStormShasse/#classement',
+  closing: 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !',
+};
+function validBaseline(value) {
+  if (!Array.isArray(value) || !value.every(p => p && typeof p.name === 'string' && Number.isInteger(p.points) && p.points >= 0 && p.points <= 35)) {
+    return SEASON_BASELINE.map(p => ({ ...p }));
+  }
+  return value;
+}
+const siteContent = () => state.siteContent || { rules: DEFAULT_RULES, leaderboard: SEASON_BASELINE };
 function groupPlayers(bets, result) {
   const map = new Map();
   for (const b of bets) {
@@ -312,7 +338,7 @@ function seasonRanking() {
       accounts.set(bet.twitch_name.trim().toLocaleLowerCase('fr'), { user_id: bet.user_id, avatar: bet.twitch_avatar });
     }
   }
-  const players = new Map(SEASON_BASELINE.map(p => {
+  const players = new Map(siteContent().leaderboard.map(p => {
     const key = p.name.trim().toLocaleLowerCase('fr');
     return [key, { ...p, ...accounts.get(key) }];
   }));
@@ -332,23 +358,83 @@ function seasonRanking() {
   return [...players.values()].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'fr'));
 }
 
+async function saveSiteContent(patch, successMessage) {
+  const content = { ...siteContent(), ...patch };
+  const { data, error } = await sb.from('site_content')
+    .update({ rules: content.rules, leaderboard: content.leaderboard })
+    .eq('id', 1).select('rules, leaderboard').maybeSingle();
+  if (error) return toast('Enregistrement impossible : ' + error.message, 'err');
+  if (!data) return toast('Réglages introuvables. Vérifie que la migration v10 a été exécutée.', 'err');
+  state.siteContent = { rules: { ...DEFAULT_RULES, ...data.rules }, leaderboard: validBaseline(data.leaderboard) };
+  if (patch.leaderboard) state.baselineDraft = null;
+  if (patch.rules) state.rulesDraft = null;
+  toast(successMessage);
+  render();
+}
+
+async function saveRules(ev) {
+  ev.preventDefault();
+  const f = ev.target.elements;
+  const rules = {};
+  for (const key of ['intro', 'commands', 'foxier', 'purpose', 'closing']) rules[key] = f[key].value.trim();
+  rules.form = f.betInstructions.value.trim();
+  const rewardsUrl = f.rewardsUrl.value.trim();
+  if (rewardsUrl) {
+    try {
+      const url = new URL(rewardsUrl);
+      if (url.protocol !== 'https:') throw new Error('https requis');
+      rules.rewardsUrl = url.href;
+    } catch {
+      return toast('Le lien des récompenses doit être une URL HTTPS valide.', 'err');
+    }
+  } else rules.rewardsUrl = '';
+  await saveSiteContent({ rules }, 'Règles mises à jour.');
+}
+
+function baselineDraft() {
+  if (!state.baselineDraft) {
+    state.baselineDraft = siteContent().leaderboard.map(p => ({ name: p.name, points: String(p.points) }));
+  }
+  return state.baselineDraft;
+}
+
+async function saveBaseline(ev) {
+  ev.preventDefault();
+  const names = new Set();
+  const players = [];
+  for (const player of baselineDraft()) {
+    const name = player.name.trim();
+    const points = Number(player.points);
+    if (!/^[A-Za-z0-9_]{2,25}$/.test(name)) return toast('Chaque pseudo doit contenir 2 à 25 lettres, chiffres ou _ .', 'err');
+    if (!player.points.trim() || !Number.isInteger(points) || points < 0 || points > 35) return toast('Les points de départ doivent être un nombre entier entre 0 et 35.', 'err');
+    const key = name.toLocaleLowerCase('fr');
+    if (names.has(key)) return toast('Chaque pseudo ne peut apparaître qu’une seule fois.', 'err');
+    names.add(key);
+    players.push({ name, points });
+  }
+  await saveSiteContent({ leaderboard: players }, 'Scores de départ mis à jour.');
+}
+
 function rulesPage() {
+  const rules = siteContent().rules;
   return h('article', { class: 'card info-page' },
     h('h1', {}, 'Fonctionnement des paris chez NovaStorm'),
-    h('p', {}, 'Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.'),
+    rules.intro && h('p', {}, rules.intro),
     h('h2', {}, 'Comment parier ?'),
-    h('p', {}, 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.'),
-    h('p', {}, 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après.'),
-    h('p', {}, 'Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !'),
+    rules.commands && h('p', {}, rules.commands),
+    rules.form && h('p', {}, rules.form),
+    rules.foxier && h('p', {}, h('strong', {}, 'Nouveauté : '), rules.foxier),
     h('h2', {}, 'Mais… à quoi ça sert ?'),
-    h('p', {}, 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour voir ces récompenses, écris “!top” dans le chat ou clique ',
-      h('a', { href: 'https://docs.google.com/document/u/0/d/1XN9aWvAgVw9cHRZd02qC-rSGpfOxesOocgcTTXI9ppk/edit', target: '_blank', rel: 'noopener noreferrer' }, 'ici'), '.'),
-    h('p', {}, 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !'));
+    rules.purpose && h('p', {}, rules.purpose),
+    rules.rewardsUrl && h('p', {}, 'Ou clique ', h('a', { href: rules.rewardsUrl }, 'ici'), '.'),
+    rules.closing && h('p', {}, rules.closing));
 }
 
 function leaderboardPage() {
   const players = seasonRanking();
   const winner = players.find(p => p.points >= 35);
+  const podium = new Map([...new Set(players.filter(p => p.points > 0).map(p => p.points))]
+    .slice(0, 3).map((points, index) => [points, ['gold', 'silver', 'bronze'][index]]));
   const scoreBuckets = Array.from({ length: 35 }, (_, i) => [35 - i, []]);
   for (const player of players) {
     if (player.points > 0) scoreBuckets[Math.max(0, 35 - Math.min(player.points, 35))][1].push(player);
@@ -377,7 +463,7 @@ function leaderboardPage() {
         h('div', { class: 'standing' },
           h('span', { class: 'standing-points' }, points + ' pts'),
           h('div', { class: 'standing-players' }, bucket.length
-            ? bucket.map(p => h('div', { class: 'who standing-user' },
+            ? bucket.map(p => h('div', { class: 'who standing-user' + (podium.has(p.points) ? ' podium-' + podium.get(p.points) : '') },
                 safeAvatar(p.avatar) && h('img', { src: safeAvatar(p.avatar), alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }),
                 h('span', {}, p.name),
                 p.points > 35 && h('small', {}, ' (' + p.points + ' pts)')))
@@ -566,12 +652,66 @@ function adminPeople() {
         mSel && tSel ? 'Fusionner ' + mSel.pseudo + ' → ' + tSel.pseudo : 'Fusionner')));
 }
 
+function adminContent() {
+  const rules = state.rulesDraft || siteContent().rules;
+  const draft = baselineDraft();
+  const sections = [
+    ['rules', 'Règles'],
+    ['leaderboard', 'Scores de départ'],
+  ];
+  const nav = h('div', { class: 'tabs' }, sections.map(([key, label]) =>
+    h('button', { class: 'tab' + (state.contentPage === key ? ' on' : ''), style: '--p:var(--twitch)',
+        onclick: () => { state.contentPage = key; render(); } }, h('b', {}, label))));
+
+  if (state.contentPage === 'leaderboard') {
+    return h('div', {},
+        nav,
+        h('section', { class: 'card admin' },
+          h('h2', {}, 'Joueurs et scores de départ'),
+          h('p', { class: 'hint' }, 'Ces scores s’ajoutent aux points calculés automatiquement lors des prochaines shasses. Utilise le pseudo Twitch exact pour afficher le compte associé.'),
+          h('form', { onsubmit: saveBaseline },
+            h('div', { class: 'baseline-edit-list' }, draft.map((player, index) =>
+              h('div', { class: 'baseline-edit-row' },
+                h('label', {}, 'Pseudo Twitch',
+                  h('input', { name: 'player-name-' + index, value: player.name, maxlength: 25, autocomplete: 'off',
+                    oninput: ev => { state.baselineDraft[index].name = ev.target.value; } })),
+                h('label', {}, 'Points de départ',
+                  h('input', { name: 'player-points-' + index, type: 'number', min: 0, max: 35, step: 1, value: player.points,
+                    oninput: ev => { state.baselineDraft[index].points = ev.target.value; } })),
+                h('button', { class: 'danger', type: 'button', onclick: () => { state.baselineDraft.splice(index, 1); render(); } }, 'Retirer')))),
+            h('div', { class: 'actions' },
+              h('button', { type: 'button', onclick: () => { state.baselineDraft.push({ name: '', points: '0' }); render(); } }, 'Ajouter un joueur'),
+              h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les scores')))));
+  }
+
+  const field = (key, label, value, rows) =>
+    h('label', {}, label, h('textarea', { name: key, rows, value, maxlength: 2000,
+      oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft[key] = ev.target.value; } }));
+  return h('div', {},
+    nav,
+    h('section', { class: 'card admin' },
+        h('h2', {}, 'Modifier les règles'),
+        h('form', { class: 'content-form', onsubmit: saveRules },
+          field('intro', 'Présentation', rules.intro, 3),
+          field('commands', 'Commandes !sw et !ds', rules.commands, 2),
+          field('betInstructions', 'Instructions pour placer un pari', rules.form, 4),
+          field('foxier', 'Parier sur les shasses de Foxier', rules.foxier, 2),
+          field('purpose', 'Récompenses et commande !top', rules.purpose, 3),
+          h('label', {}, 'Lien des récompenses (HTTPS, facultatif)',
+            h('input', { name: 'rewardsUrl', type: 'url', value: rules.rewardsUrl, maxlength: 500,
+              oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft.rewardsUrl = ev.target.value; } })),
+          field('closing', 'Message de fin', rules.closing, 2),
+          h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les règles'))));
+}
+
 function adminView() {
-  const nav = h('div', { class: 'tabs' }, [['hunts', 'Shasses'], ['people', 'Joueurs']].map(([k, label]) =>
+  const nav = h('div', { class: 'tabs' }, [['hunts', 'Shasses'], ['people', 'Joueurs'], ['content', 'Contenu']].map(([k, label]) =>
     h('button', { class: 'tab' + (state.adminPage === k ? ' on' : ''), style: '--p:var(--twitch)',
       onclick: async () => { state.adminPage = k; state.adminHuntId = null; if (k === 'people') await loadPeople(); render(); } }, h('b', {}, label))));
   const cur = state.adminHuntId ? state.hunts.find(x => x.id === state.adminHuntId) : null;
-  return h('div', {}, nav, state.adminPage === 'people' ? adminPeople() : cur ? adminDetail(cur) : adminList());
+  return h('div', {}, nav,
+    state.adminPage === 'content' ? adminContent() :
+        state.adminPage === 'people' ? adminPeople() : cur ? adminDetail(cur) : adminList());
 }
 
 function render() {
@@ -581,6 +721,7 @@ function render() {
     if (page === state.page) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
+  if (state.view === 'admin' && state.isAdmin) { $app.replaceChildren(adminView()); return; }
   if (state.page === 'rules') { $app.replaceChildren(rulesPage()); return; }
   if (state.page === 'leaderboard') { $app.replaceChildren(leaderboardPage()); return; }
   if (!configured) {
@@ -589,7 +730,6 @@ function render() {
       h('p', { class: 'setup' }, 'Renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du script de index.html (voir le README).')));
     return;
   }
-  if (state.view === 'admin' && state.isAdmin) { $app.replaceChildren(adminView()); return; }
   const list = state.hunts.filter(x => x.platform === state.tab)
     .sort((a, b) => (a.status === 'finished') - (b.status === 'finished'));
   const tabP = PLATFORMS.find(p => p.key === state.tab);
@@ -638,7 +778,7 @@ async function start() {
   });
   // rafraîchissement doux toutes les 20 s quand l'onglet est visible
   setInterval(() => {
-    if (document.hidden || document.activeElement?.tagName === 'INPUT') return;
+    if (document.hidden || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     refresh();
   }, 20000);
 }
