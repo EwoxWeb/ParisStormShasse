@@ -306,14 +306,25 @@ function groupPlayers(bets, result) {
 const pointsFor = (p, rank) => p.diff === 0 ? 5 : ({ 1: 3, 2: 2, 3: 1 }[rank] || 0);
 
 function seasonRanking() {
-  const players = new Map(SEASON_BASELINE.map(p => [p.name.toLocaleLowerCase('fr'), { ...p }]));
+  const accounts = new Map();
+  for (const bet of state.bets) {
+    if (bet.user_id && bet.twitch_name) {
+      accounts.set(bet.twitch_name.trim().toLocaleLowerCase('fr'), { user_id: bet.user_id, avatar: bet.twitch_avatar });
+    }
+  }
+  const players = new Map(SEASON_BASELINE.map(p => {
+    const key = p.name.trim().toLocaleLowerCase('fr');
+    return [key, { ...p, ...accounts.get(key) }];
+  }));
   for (const cur of state.hunts) {
     if (cur.result == null || !cur.result_at || new Date(cur.result_at) < new Date(SEASON_START_AT)) continue;
     const bets = betsOfHunt(cur.id);
     const ranked = groupPlayers(bets, cur.result);
     ranked.forEach((p, i) => {
-      const key = p.name.toLocaleLowerCase('fr');
-      const current = players.get(key) || { name: p.name, points: 0 };
+      const key = p.name.trim().toLocaleLowerCase('fr');
+      const current = players.get(key) || { name: p.name, points: 0, user_id: p.user_id, avatar: p.avatar };
+      current.user_id = current.user_id || p.user_id;
+      current.avatar = current.avatar || p.avatar;
       current.points += pointsFor(p, i + 1);
       players.set(key, current);
     });
@@ -366,7 +377,9 @@ function leaderboardPage() {
         h('div', { class: 'standing' },
           h('span', { class: 'standing-points' }, points + ' pts'),
           h('div', { class: 'standing-players' }, bucket.length
-            ? bucket.map(p => h('span', { class: 'standing-name' }, p.name,
+            ? bucket.map(p => h('span', { class: 'standing-user' },
+                safeAvatar(p.avatar) && h('img', { src: safeAvatar(p.avatar), alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }),
+                h('span', {}, p.name),
                 p.points > 35 && h('small', {}, ' (' + p.points + ' pts)')))
             : '—')))),
       h('p', { class: 'hint' }, 'Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement.')));
