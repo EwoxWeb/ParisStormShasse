@@ -30,7 +30,11 @@
   .admin-nav { margin-top: -12px; padding-top: 12px; border-top: 1px solid var(--soft); }
   .admin-nav[hidden] { display: none; }
   .admin-nav-button { padding: 8px 14px; background: var(--card); font-weight: 700; }
-  .admin-nav-button:hover, .admin-nav-button[aria-current="page"] { background: var(--gold); color: var(--gold-ink); }
+  .admin-nav-button:hover, .admin-nav-button[aria-current="page"], .admin-nav-button[aria-expanded="true"] { background: var(--gold); color: var(--gold-ink); }
+  .admin-dropdown { position: relative; }
+  .admin-dropdown-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: flex; flex-direction: column; gap: 4px; min-width: 220px; padding: 6px; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; box-shadow: 3px 3px 0 var(--shadow); }
+  .admin-dropdown-item { width: 100%; padding: 8px 10px; text-align: left; background: transparent; border-color: transparent; box-shadow: none; }
+  .admin-dropdown-item:hover, .admin-dropdown-item[aria-current="page"] { background: var(--soft); transform: none; box-shadow: none; }
 
   button, select, input, textarea { font: inherit; color: inherit; }
   button { border: 2px solid var(--edge); border-radius: 8px; padding: 9px 16px; font-weight: 600; cursor: pointer;
@@ -106,8 +110,6 @@
   .admin input { background: var(--card); border: 2px solid var(--edge); border-radius: 8px; padding: 9px 12px; color: var(--text); }
   .admin textarea { width: 100%; min-height: 64px; resize: vertical; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; padding: 9px 12px; color: var(--text); }
   .admin .content-form { flex-direction: column; align-items: stretch; }
-  .admin-content-menu { max-width: 360px; margin-bottom: 12px; }
-  .admin-content-menu select { display: block; width: 100%; margin-top: 4px; padding: 9px 12px; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; }
   .baseline-edit-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
   .baseline-edit-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(120px, 180px) auto; gap: 12px; align-items: end; padding-bottom: 12px; border-bottom: 1px solid var(--soft); }
   .baseline-edit-row label { min-width: 0; }

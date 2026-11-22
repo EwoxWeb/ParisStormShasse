@@ -19,7 +19,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', contentMenuOpen: false, siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -728,18 +728,9 @@ function adminPeople() {
 function adminContent() {
   const rules = state.rulesDraft || siteContent().rules;
   const draft = baselineDraft();
-  const sections = [
-    ['rules', 'Règles'],
-    ['rankingContent', 'Texte du classement'],
-    ['leaderboard', 'Scores de départ'],
-  ];
-  const contentMenu = h('label', { class: 'admin-content-menu' }, 'Contenu à modifier',
-    h('select', { onchange: ev => { state.contentPage = ev.target.value; render(); } },
-      sections.map(([key, label]) => h('option', { value: key, selected: state.contentPage === key }, label))));
 
   if (state.contentPage === 'leaderboard') {
     return h('div', {},
-        contentMenu,
         h('section', { class: 'card admin' },
           h('h2', {}, 'Joueurs et scores de départ'),
           h('p', { class: 'hint' }, 'Ces scores s’ajoutent aux points calculés automatiquement lors des prochaines shasses. Utilise le pseudo Twitch exact pour afficher le compte associé.'),
@@ -761,7 +752,6 @@ function adminContent() {
   if (state.contentPage === 'rankingContent') {
     const content = leaderboardContentDraft();
     return h('div', {},
-      contentMenu,
       h('section', { class: 'card admin' },
         h('h2', {}, 'Texte de la page Classement'),
         h('p', { class: 'hint' }, 'Modifie le titre, les paragraphes affichés au-dessus des scores et les récompenses. Le barème reste fixe.'),
@@ -804,7 +794,6 @@ function adminContent() {
     h('label', {}, label, h('textarea', { name: key, rows, value, maxlength: 2000,
       oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft[key] = ev.target.value; } }));
   return h('div', {},
-    contentMenu,
     h('section', { class: 'card admin' },
         h('h2', {}, 'Modifier les règles'),
         h('form', { class: 'content-form', onsubmit: saveRules },
@@ -821,15 +810,38 @@ function adminContent() {
 }
 
 function adminNavigation() {
-  return [['hunts', 'Shasses'], ['people', 'Joueurs'], ['content', 'Contenu']].map(([key, label]) =>
+  const navigate = async key => {
+    state.adminPage = key;
+    state.adminHuntId = null;
+    state.page = 'bets';
+    state.contentMenuOpen = false;
+    if (key === 'people') await loadPeople();
+    render();
+  };
+  const mainItems = [['hunts', 'Shasses'], ['people', 'Joueurs']].map(([key, label]) =>
     h('button', { class: 'admin-nav-button', 'aria-current': state.adminPage === key ? 'page' : null,
-      onclick: async () => {
-        state.adminPage = key;
-        state.adminHuntId = null;
-        state.page = 'bets';
-        if (key === 'people') await loadPeople();
-        render();
-      } }, label));
+      onclick: () => navigate(key) }, label));
+  return [
+    ...mainItems,
+    h('div', { class: 'admin-dropdown' },
+      h('button', { class: 'admin-nav-button', 'aria-current': state.adminPage === 'content' ? 'page' : null,
+        'aria-haspopup': 'menu', 'aria-expanded': state.contentMenuOpen ? 'true' : 'false',
+        onclick: () => {
+          state.adminPage = 'content';
+          state.adminHuntId = null;
+          state.page = 'bets';
+          state.contentMenuOpen = !state.contentMenuOpen;
+          render();
+        } }, 'Contenu'),
+      state.contentMenuOpen && h('div', { class: 'admin-dropdown-menu', role: 'menu' },
+        [['rules', 'Règles'], ['rankingContent', 'Texte du classement'], ['leaderboard', 'Scores de départ']].map(([key, label]) =>
+          h('button', { class: 'admin-dropdown-item', role: 'menuitem',
+            'aria-current': state.adminPage === 'content' && state.contentPage === key ? 'page' : null,
+            onclick: () => {
+              state.contentPage = key;
+              navigate('content');
+            } }, label))))
+  ];
 }
 
 function adminView() {
