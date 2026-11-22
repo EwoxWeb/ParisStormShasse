@@ -19,7 +19,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', contentMenuOpen: false, siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -814,7 +814,6 @@ function adminNavigation() {
     state.adminPage = key;
     state.adminHuntId = null;
     state.page = 'bets';
-    state.contentMenuOpen = false;
     if (key === 'people') await loadPeople();
     render();
   };
@@ -825,15 +824,8 @@ function adminNavigation() {
     ...mainItems,
     h('div', { class: 'admin-dropdown' },
       h('button', { class: 'admin-nav-button', 'aria-current': state.adminPage === 'content' ? 'page' : null,
-        'aria-haspopup': 'menu', 'aria-expanded': state.contentMenuOpen ? 'true' : 'false',
-        onclick: () => {
-          state.adminPage = 'content';
-          state.adminHuntId = null;
-          state.page = 'bets';
-          state.contentMenuOpen = !state.contentMenuOpen;
-          render();
-        } }, 'Contenu'),
-      state.contentMenuOpen && h('div', { class: 'admin-dropdown-menu', role: 'menu' },
+        'aria-haspopup': 'menu', onclick: () => navigate('content') }, 'Contenu'),
+      h('div', { class: 'admin-dropdown-menu', role: 'menu' },
         [['rules', 'Règles'], ['rankingContent', 'Texte du classement'], ['leaderboard', 'Scores de départ']].map(([key, label]) =>
           h('button', { class: 'admin-dropdown-item', role: 'menuitem',
             'aria-current': state.adminPage === 'content' && state.contentPage === key ? 'page' : null,
