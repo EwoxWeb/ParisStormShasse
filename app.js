@@ -18,7 +18,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -96,14 +96,18 @@ async function loadCounts() {
   (data || []).forEach(r => { state.counts[r.hunt_id] = (state.counts[r.hunt_id] || 0) + 1; });
 }
 async function loadSiteContent() {
-  const { data, error } = await sb.from('site_content').select('rules, leaderboard').eq('id', 1).maybeSingle();
+  const { data, error } = await sb.from('site_content').select('rules, leaderboard, leaderboard_content').eq('id', 1).maybeSingle();
   if (error) {
-    if (!state.siteContentErrorShown) toast('Chargement du contenu admin impossible : ' + error.message + ' (vérifie la migration v10).', 'err');
+    if (!state.siteContentErrorShown) toast('Chargement du contenu admin impossible : ' + error.message + ' (vérifie la migration v12).', 'err');
     state.siteContentErrorShown = true;
     return;
   }
   state.siteContentErrorShown = false;
-  if (data) state.siteContent = { rules: { ...DEFAULT_RULES, ...data.rules }, leaderboard: validBaseline(data.leaderboard) };
+  if (data) state.siteContent = {
+    rules: { ...DEFAULT_RULES, ...data.rules },
+    leaderboard: validBaseline(data.leaderboard),
+    leaderboardContent: validLeaderboardContent(data.leaderboard_content),
+  };
 }
 async function refresh() { await loadHunts(); await loadBets(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
 
@@ -301,13 +305,45 @@ const DEFAULT_RULES = {
   rewardsUrl: 'https://ewoxweb.github.io/ParisStormShasse/#classement',
   closing: 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !',
 };
+const DEFAULT_LEADERBOARD_CONTENT = {
+  paragraphs: [
+    { text: 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !', highlight: false },
+    { text: 'NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.', highlight: true },
+  ],
+  rewards: [
+    'Un grade VIP à vie sur la chaîne.',
+    'Un sub offert (1 mois).',
+    'Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).',
+    'Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).',
+    'Une carte cadeau Nintendo de 10 €.',
+    'Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable).',
+  ],
+};
+function defaultLeaderboardContent() {
+  return {
+    paragraphs: DEFAULT_LEADERBOARD_CONTENT.paragraphs.map(p => ({ ...p })),
+    rewards: [...DEFAULT_LEADERBOARD_CONTENT.rewards],
+  };
+}
+function validLeaderboardContent(value) {
+  if (!value || !Array.isArray(value.paragraphs)
+    || !value.paragraphs.every(p => p && typeof p.text === 'string' && typeof p.highlight === 'boolean')
+    || !Array.isArray(value.rewards) || !value.rewards.every(reward => typeof reward === 'string')) {
+    return defaultLeaderboardContent();
+  }
+  return { paragraphs: value.paragraphs, rewards: value.rewards };
+}
 function validBaseline(value) {
   if (!Array.isArray(value) || !value.every(p => p && typeof p.name === 'string' && Number.isInteger(p.points) && p.points >= 0 && p.points <= 35)) {
     return SEASON_BASELINE.map(p => ({ ...p }));
   }
   return value;
 }
-const siteContent = () => state.siteContent || { rules: DEFAULT_RULES, leaderboard: SEASON_BASELINE };
+const siteContent = () => state.siteContent || {
+  rules: DEFAULT_RULES,
+  leaderboard: SEASON_BASELINE,
+  leaderboardContent: DEFAULT_LEADERBOARD_CONTENT,
+};
 function groupPlayers(bets, result) {
   const map = new Map();
   for (const b of bets) {
@@ -361,13 +397,18 @@ function seasonRanking() {
 async function saveSiteContent(patch, successMessage) {
   const content = { ...siteContent(), ...patch };
   const { data, error } = await sb.from('site_content')
-    .update({ rules: content.rules, leaderboard: content.leaderboard })
-    .eq('id', 1).select('rules, leaderboard').maybeSingle();
+    .update({ rules: content.rules, leaderboard: content.leaderboard, leaderboard_content: content.leaderboardContent })
+    .eq('id', 1).select('rules, leaderboard, leaderboard_content').maybeSingle();
   if (error) return toast('Enregistrement impossible : ' + error.message, 'err');
   if (!data) return toast('Réglages introuvables. Vérifie que la migration v10 a été exécutée.', 'err');
-  state.siteContent = { rules: { ...DEFAULT_RULES, ...data.rules }, leaderboard: validBaseline(data.leaderboard) };
+  state.siteContent = {
+    rules: { ...DEFAULT_RULES, ...data.rules },
+    leaderboard: validBaseline(data.leaderboard),
+    leaderboardContent: validLeaderboardContent(data.leaderboard_content),
+  };
   if (patch.leaderboard) state.baselineDraft = null;
   if (patch.rules) state.rulesDraft = null;
+  if (patch.leaderboardContent) state.leaderboardContentDraft = null;
   toast(successMessage);
   render();
 }
@@ -415,6 +456,31 @@ async function saveBaseline(ev) {
   await saveSiteContent({ leaderboard: players }, 'Scores de départ mis à jour.');
 }
 
+function leaderboardContentDraft() {
+  if (!state.leaderboardContentDraft) {
+    const content = validLeaderboardContent(siteContent().leaderboardContent);
+    state.leaderboardContentDraft = {
+      paragraphs: content.paragraphs.map(p => ({ ...p })),
+      rewards: [...content.rewards],
+    };
+  }
+  return state.leaderboardContentDraft;
+}
+
+async function saveLeaderboardContent(ev) {
+  ev.preventDefault();
+  const draft = leaderboardContentDraft();
+  const paragraphs = draft.paragraphs.map(p => ({ text: p.text.trim(), highlight: !!p.highlight }));
+  const rewards = draft.rewards.map(reward => reward.trim());
+  if (paragraphs.some(p => !p.text || p.text.length > 2000)) {
+    return toast('Chaque paragraphe doit contenir entre 1 et 2 000 caractères.', 'err');
+  }
+  if (rewards.some(reward => !reward || reward.length > 500)) {
+    return toast('Chaque récompense doit contenir entre 1 et 500 caractères.', 'err');
+  }
+  await saveSiteContent({ leaderboardContent: { paragraphs, rewards } }, 'Texte du classement mis à jour.');
+}
+
 function rulesPage() {
   const rules = siteContent().rules;
   return h('article', { class: 'card info-page' },
@@ -432,6 +498,7 @@ function rulesPage() {
 
 function leaderboardPage() {
   const players = seasonRanking();
+  const content = validLeaderboardContent(siteContent().leaderboardContent);
   const winner = players.find(p => p.points >= 35);
   const podium = new Map([...new Set(players.filter(p => p.points > 0).map(p => p.points))]
     .slice(0, 3).map((points, index) => [points, ['gold', 'silver', 'bronze'][index]]));
@@ -442,16 +509,10 @@ function leaderboardPage() {
   return h('div', {},
     h('section', { class: 'card info-page' },
       h('h1', {}, 'Classement des paris — Saison 2'),
-      h('p', {}, 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !'),
-      h('p', { class: 'notice' }, h('strong', {}, 'NOUVEAU : '), 'Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.'),
+      ...content.paragraphs.map(p => h('p', { class: p.highlight ? 'notice' : null }, p.text)),
       h('h2', {}, 'Récompenses pour les 6 premiers'),
       h('ol', { class: 'rewards' },
-        ['Un grade VIP à vie sur la chaîne.',
-          'Un sub offert (1 mois).',
-          'Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).',
-          'Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).',
-          'Une carte cadeau Nintendo de 10 €.',
-          'Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable).'].map(text => h('li', {}, text))),
+        content.rewards.map(text => h('li', {}, text))),
       h('h2', {}, 'Attribution des points'),
       h('ul', { class: 'points-list' },
         ['Nombre pile = 5 points', '1er = 3 points', '2ème = 2 points', '3ème = 1 point'].map(text => h('li', {}, text))),
@@ -657,6 +718,7 @@ function adminContent() {
   const draft = baselineDraft();
   const sections = [
     ['rules', 'Règles'],
+    ['rankingContent', 'Texte du classement'],
     ['leaderboard', 'Scores de départ'],
   ];
   const nav = h('div', { class: 'tabs' }, sections.map(([key, label]) =>
@@ -682,6 +744,45 @@ function adminContent() {
             h('div', { class: 'actions' },
               h('button', { type: 'button', onclick: () => { state.baselineDraft.push({ name: '', points: '0' }); render(); } }, 'Ajouter un joueur'),
               h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les scores')))));
+  }
+
+  if (state.contentPage === 'rankingContent') {
+    const content = leaderboardContentDraft();
+    return h('div', {},
+      nav,
+      h('section', { class: 'card admin' },
+        h('h2', {}, 'Texte de la page Classement'),
+        h('p', { class: 'hint' }, 'Modifie les paragraphes affichés au-dessus des scores et les récompenses. Le titre et le barème restent fixes.'),
+        h('form', { class: 'content-form', onsubmit: saveLeaderboardContent },
+          h('h3', {}, 'Paragraphes'),
+          h('div', { class: 'ranking-edit-list' }, content.paragraphs.map((paragraph, index) =>
+            h('div', { class: 'ranking-edit-row' },
+              h('label', {}, 'Paragraphe ' + (index + 1),
+                h('textarea', { maxlength: 2000, value: paragraph.text,
+                  oninput: ev => { content.paragraphs[index].text = ev.target.value; } })),
+              h('div', { class: 'ranking-edit-actions' },
+                h('label', { class: 'chk' },
+                  h('input', { type: 'checkbox', checked: paragraph.highlight,
+                    onchange: ev => { content.paragraphs[index].highlight = ev.target.checked; } }),
+                  'Mettre en évidence'),
+                h('button', { class: 'danger', type: 'button',
+                  onclick: () => { content.paragraphs.splice(index, 1); render(); } }, 'Retirer'))))),
+          h('div', { class: 'actions' },
+            h('button', { type: 'button',
+              onclick: () => { content.paragraphs.push({ text: '', highlight: false }); render(); } }, 'Ajouter un paragraphe')),
+          h('hr'),
+          h('h3', {}, 'Récompenses'),
+          h('div', { class: 'ranking-edit-list' }, content.rewards.map((reward, index) =>
+            h('div', { class: 'ranking-edit-row' },
+              h('label', {}, 'Récompense ' + (index + 1),
+                h('input', { type: 'text', maxlength: 500, value: reward,
+                  oninput: ev => { content.rewards[index] = ev.target.value; } })),
+              h('button', { class: 'danger', type: 'button',
+                onclick: () => { content.rewards.splice(index, 1); render(); } }, 'Retirer')))),
+          h('div', { class: 'actions' },
+            h('button', { type: 'button',
+              onclick: () => { content.rewards.push(''); render(); } }, 'Ajouter une récompense'),
+            h('button', { class: 'gold', type: 'submit' }, 'Enregistrer le texte')))));
   }
 
   const field = (key, label, value, rows) =>

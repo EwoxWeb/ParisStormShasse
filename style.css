@@ -105,6 +105,10 @@
   .baseline-edit-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
   .baseline-edit-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(120px, 180px) auto; gap: 12px; align-items: end; padding-bottom: 12px; border-bottom: 1px solid var(--soft); }
   .baseline-edit-row label { min-width: 0; }
+  .ranking-edit-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+  .ranking-edit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding-bottom: 12px; border-bottom: 1px solid var(--soft); }
+  .ranking-edit-row > label { min-width: 0; }
+  .ranking-edit-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
   .admin .consoles { display: flex; gap: 16px; align-items: center; padding-bottom: 8px; }
   .admin label.chk { flex-direction: row; align-items: center; gap: 6px; color: var(--text); font-size: 16px; }
   .admin label.chk input { width: 18px; height: 18px; padding: 0; accent-color: var(--twitch); }

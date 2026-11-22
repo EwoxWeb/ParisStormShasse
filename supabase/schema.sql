@@ -93,10 +93,11 @@ $$;
 create table public.site_content (
   id          smallint primary key default 1 check (id = 1),
   rules       jsonb not null check (jsonb_typeof(rules) = 'object'),
-  leaderboard jsonb not null check (jsonb_typeof(leaderboard) = 'array')
+  leaderboard jsonb not null check (jsonb_typeof(leaderboard) = 'array'),
+  leaderboard_content jsonb not null check (jsonb_typeof(leaderboard_content) = 'object')
 );
 
-insert into public.site_content (id, rules, leaderboard) values (
+insert into public.site_content (id, rules, leaderboard, leaderboard_content) values (
   1,
   '{
     "intro": "Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.",
@@ -112,7 +113,21 @@ insert into public.site_content (id, rules, leaderboard) values (
     {"name": "Dylho", "points": 9},
     {"name": "Pokemaz", "points": 5},
     {"name": "Ewox", "points": 2}
-  ]'::jsonb
+  ]'::jsonb,
+  '{
+    "paragraphs": [
+      {"text": "Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !", "highlight": false},
+      {"text": "NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.", "highlight": true}
+    ],
+    "rewards": [
+      "Un grade VIP à vie sur la chaîne.",
+      "Un sub offert (1 mois).",
+      "Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).",
+      "Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).",
+      "Une carte cadeau Nintendo de 10 €.",
+      "Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable)."
+    ]
+  }'::jsonb
 );
 
 alter table public.site_content enable row level security;
