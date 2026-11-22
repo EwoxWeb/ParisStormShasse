@@ -328,8 +328,7 @@ function rulesPage() {
     h('h2', {}, 'Comment parier ?'),
     h('p', {}, 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.'),
     h('p', {}, 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après.'),
-    h('p', {}, 'Clique sur “envoyer” et voilà ! Ton pari est enregistré !'),
-    h('p', {}, h('strong', {}, 'Nouveauté : '), 'Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.'),
+    h('p', {}, 'Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !'),
     h('h2', {}, 'Mais… à quoi ça sert ?'),
     h('p', {}, 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour voir ces récompenses, écris “!top” dans le chat ou clique ',
       h('a', { href: 'https://docs.google.com/document/u/0/d/1XN9aWvAgVw9cHRZd02qC-rSGpfOxesOocgcTTXI9ppk/edit', target: '_blank', rel: 'noopener noreferrer' }, 'ici'), '.'),
@@ -339,6 +338,10 @@ function rulesPage() {
 function leaderboardPage() {
   const players = seasonRanking();
   const winner = players.find(p => p.points >= 35);
+  const scoreBuckets = Array.from({ length: 35 }, (_, i) => [35 - i, []]);
+  for (const player of players) {
+    if (player.points > 0) scoreBuckets[Math.max(0, 35 - Math.min(player.points, 35))][1].push(player);
+  }
   return h('div', {},
     h('section', { class: 'card info-page' },
       h('h1', {}, 'Classement des paris — Saison 2'),
@@ -359,13 +362,13 @@ function leaderboardPage() {
     h('section', { class: 'card' },
       h('h2', {}, 'Classement'),
       winner && h('p', { class: 'notice' }, 'Seuil des 35 points atteint par ', h('strong', {}, winner.name), ' (', winner.points, ' points) !'),
-      players.length
-        ? h('div', { class: 'standings' }, players.map((p, i) =>
-            h('div', { class: 'standing' },
-              h('span', { class: 'standing-rank' }, i + 1),
-              h('span', { class: 'standing-name' }, p.name),
-              h('span', { class: 'standing-points' }, p.points + ' pts'))))
-        : h('p', { class: 'empty' }, 'Le classement sera actualisé après les prochains résultats.'),
+      h('div', { class: 'standings' }, scoreBuckets.map(([points, bucket]) =>
+        h('div', { class: 'standing' },
+          h('span', { class: 'standing-points' }, points + ' pts'),
+          h('div', { class: 'standing-players' }, bucket.length
+            ? bucket.map(p => h('span', { class: 'standing-name' }, p.name,
+                p.points > 35 && h('small', {}, ' (' + p.points + ' pts)')))
+            : '—')))),
       h('p', { class: 'hint' }, 'Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement.')));
 }
 

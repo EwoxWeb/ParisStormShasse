@@ -124,11 +124,12 @@
   .rewards, .points-list { padding-left: 24px; }
   .rewards li, .points-list li { padding: 3px 0; }
   .standings { display: flex; flex-direction: column; border: 2px solid var(--edge); border-radius: 10px; overflow: hidden; }
-  .standing { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 11px 14px; background: var(--card); border-bottom: 1px solid var(--soft); }
+  .standing { display: grid; grid-template-columns: 80px 1fr; gap: 12px; align-items: center; padding: 11px 14px; background: var(--card); border-bottom: 1px solid var(--soft); }
   .standing:last-child { border-bottom: 0; }
-  .standing-rank { color: var(--muted); text-align: center; font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; }
-  .standing-name { font-weight: 700; overflow-wrap: anywhere; }
-  .standing-points { font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+  .standing-players { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); }
+  .standing-name { font-weight: 700; overflow-wrap: anywhere; color: var(--text); }
+  .standing-name small { color: var(--muted); font-weight: 500; }
+  .standing-points { font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; font-weight: 700; }
 
   #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--text); color: var(--bg); border: 2px solid var(--text);
     padding: 12px 18px; border-radius: 10px; max-width: 90vw; z-index: 10; display: none; font-weight: 600; box-shadow: 4px 4px 0 var(--shadow); }
