@@ -721,9 +721,9 @@ function render() {
     if (page === state.page) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  if (state.view === 'admin' && state.isAdmin) { $app.replaceChildren(adminView()); return; }
   if (state.page === 'rules') { $app.replaceChildren(rulesPage()); return; }
   if (state.page === 'leaderboard') { $app.replaceChildren(leaderboardPage()); return; }
+  if (state.view === 'admin' && state.isAdmin) { $app.replaceChildren(adminView()); return; }
   if (!configured) {
     $app.replaceChildren(h('div', { class: 'card' },
       h('h2', {}, 'Configuration manquante'),
