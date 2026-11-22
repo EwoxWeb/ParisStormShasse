@@ -377,7 +377,7 @@ function leaderboardPage() {
         h('div', { class: 'standing' },
           h('span', { class: 'standing-points' }, points + ' pts'),
           h('div', { class: 'standing-players' }, bucket.length
-            ? bucket.map(p => h('span', { class: 'standing-user' },
+            ? bucket.map(p => h('div', { class: 'who standing-user' },
                 safeAvatar(p.avatar) && h('img', { src: safeAvatar(p.avatar), alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }),
                 h('span', {}, p.name),
                 p.points > 35 && h('small', {}, ' (' + p.points + ' pts)')))
