@@ -178,14 +178,14 @@ async function deleteBet(id) {
 /* ---------- images de shasse (Supabase Storage, bucket public « pokemon ») ---------- */
 const IMG_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const ACCEPT_IMG = Object.keys(IMG_TYPES).join(',');
-const MAX_IMG = 2 * 1024 * 1024;
+const MAX_IMG = 10 * 1024 * 1024;
 const IMG_PATH_RE = /^[0-9a-f-]{36}\.(png|jpg|jpeg|gif|webp)$/;
 const imgUrl = x => (x && IMG_PATH_RE.test(x.image_path || '')) ? SUPABASE_URL + '/storage/v1/object/public/pokemon/' + x.image_path : '';
 const huntImg = x => imgUrl(x) && h('img', { class: 'poke', src: imgUrl(x), alt: x.title, loading: 'lazy', referrerpolicy: 'no-referrer' });
 function checkImage(file) {
   if (!file) return null;
   if (!IMG_TYPES[file.type]) return 'Format non accepté : PNG, JPG, GIF ou WebP uniquement.';
-  if (file.size > MAX_IMG) return 'Image trop lourde (2 Mo maximum).';
+  if (file.size > MAX_IMG) return 'Image trop lourde (10 Mo maximum).';
   return null;
 }
 async function uploadImage(file) {
