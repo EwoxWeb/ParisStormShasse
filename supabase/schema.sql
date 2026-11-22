@@ -115,6 +115,7 @@ insert into public.site_content (id, rules, leaderboard, leaderboard_content) va
     {"name": "Ewox", "points": 2}
   ]'::jsonb,
   '{
+    "title": "Classement des paris — Saison 2",
     "paragraphs": [
       {"text": "Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !", "highlight": false},
       {"text": "NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.", "highlight": true}

@@ -9,6 +9,7 @@ const configured = !!SUPABASE_URL && !!SUPABASE_ANON_KEY
 const $app = document.getElementById('app');
 const $auth = document.getElementById('auth');
 const $nav = document.getElementById('site-nav');
+const $adminNav = document.getElementById('admin-nav');
 const $toast = document.getElementById('toast');
 
 /* Les deux consoles de la double shasse */
@@ -306,6 +307,7 @@ const DEFAULT_RULES = {
   closing: 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !',
 };
 const DEFAULT_LEADERBOARD_CONTENT = {
+  title: 'Classement des paris — Saison 2',
   paragraphs: [
     { text: 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !', highlight: false },
     { text: 'NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.', highlight: true },
@@ -321,6 +323,7 @@ const DEFAULT_LEADERBOARD_CONTENT = {
 };
 function defaultLeaderboardContent() {
   return {
+    title: DEFAULT_LEADERBOARD_CONTENT.title,
     paragraphs: DEFAULT_LEADERBOARD_CONTENT.paragraphs.map(p => ({ ...p })),
     rewards: [...DEFAULT_LEADERBOARD_CONTENT.rewards],
   };
@@ -331,7 +334,11 @@ function validLeaderboardContent(value) {
     || !Array.isArray(value.rewards) || !value.rewards.every(reward => typeof reward === 'string')) {
     return defaultLeaderboardContent();
   }
-  return { paragraphs: value.paragraphs, rewards: value.rewards };
+  return {
+    title: typeof value.title === 'string' ? value.title : DEFAULT_LEADERBOARD_CONTENT.title,
+    paragraphs: value.paragraphs,
+    rewards: value.rewards,
+  };
 }
 function validBaseline(value) {
   if (!Array.isArray(value) || !value.every(p => p && typeof p.name === 'string' && Number.isInteger(p.points) && p.points >= 0 && p.points <= 35)) {
@@ -460,6 +467,7 @@ function leaderboardContentDraft() {
   if (!state.leaderboardContentDraft) {
     const content = validLeaderboardContent(siteContent().leaderboardContent);
     state.leaderboardContentDraft = {
+      title: content.title,
       paragraphs: content.paragraphs.map(p => ({ ...p })),
       rewards: [...content.rewards],
     };
@@ -470,15 +478,19 @@ function leaderboardContentDraft() {
 async function saveLeaderboardContent(ev) {
   ev.preventDefault();
   const draft = leaderboardContentDraft();
+  const title = draft.title.trim();
   const paragraphs = draft.paragraphs.map(p => ({ text: p.text.trim(), highlight: !!p.highlight }));
   const rewards = draft.rewards.map(reward => reward.trim());
+  if (!title || title.length > 120) {
+    return toast('Le titre doit contenir entre 1 et 120 caractères.', 'err');
+  }
   if (paragraphs.some(p => !p.text || p.text.length > 2000)) {
     return toast('Chaque paragraphe doit contenir entre 1 et 2 000 caractères.', 'err');
   }
   if (rewards.some(reward => !reward || reward.length > 500)) {
     return toast('Chaque récompense doit contenir entre 1 et 500 caractères.', 'err');
   }
-  await saveSiteContent({ leaderboardContent: { paragraphs, rewards } }, 'Texte du classement mis à jour.');
+  await saveSiteContent({ leaderboardContent: { title, paragraphs, rewards } }, 'Texte du classement mis à jour.');
 }
 
 function rulesPage() {
@@ -508,7 +520,7 @@ function leaderboardPage() {
   }
   return h('div', {},
     h('section', { class: 'card info-page' },
-      h('h1', {}, 'Classement des paris — Saison 2'),
+      h('h1', {}, content.title),
       ...content.paragraphs.map(p => h('p', { class: p.highlight ? 'notice' : null }, p.text)),
       h('h2', {}, 'Récompenses pour les 6 premiers'),
       h('ol', { class: 'rewards' },
@@ -721,13 +733,13 @@ function adminContent() {
     ['rankingContent', 'Texte du classement'],
     ['leaderboard', 'Scores de départ'],
   ];
-  const nav = h('div', { class: 'tabs' }, sections.map(([key, label]) =>
-    h('button', { class: 'tab' + (state.contentPage === key ? ' on' : ''), style: '--p:var(--twitch)',
-        onclick: () => { state.contentPage = key; render(); } }, h('b', {}, label))));
+  const contentMenu = h('label', { class: 'admin-content-menu' }, 'Contenu à modifier',
+    h('select', { onchange: ev => { state.contentPage = ev.target.value; render(); } },
+      sections.map(([key, label]) => h('option', { value: key, selected: state.contentPage === key }, label))));
 
   if (state.contentPage === 'leaderboard') {
     return h('div', {},
-        nav,
+        contentMenu,
         h('section', { class: 'card admin' },
           h('h2', {}, 'Joueurs et scores de départ'),
           h('p', { class: 'hint' }, 'Ces scores s’ajoutent aux points calculés automatiquement lors des prochaines shasses. Utilise le pseudo Twitch exact pour afficher le compte associé.'),
@@ -749,11 +761,14 @@ function adminContent() {
   if (state.contentPage === 'rankingContent') {
     const content = leaderboardContentDraft();
     return h('div', {},
-      nav,
+      contentMenu,
       h('section', { class: 'card admin' },
         h('h2', {}, 'Texte de la page Classement'),
-        h('p', { class: 'hint' }, 'Modifie les paragraphes affichés au-dessus des scores et les récompenses. Le titre et le barème restent fixes.'),
+        h('p', { class: 'hint' }, 'Modifie le titre, les paragraphes affichés au-dessus des scores et les récompenses. Le barème reste fixe.'),
         h('form', { class: 'content-form', onsubmit: saveLeaderboardContent },
+          h('label', {}, 'Titre du classement',
+            h('input', { type: 'text', maxlength: 120, value: content.title,
+              oninput: ev => { content.title = ev.target.value; } })),
           h('h3', {}, 'Paragraphes'),
           h('div', { class: 'ranking-edit-list' }, content.paragraphs.map((paragraph, index) =>
             h('div', { class: 'ranking-edit-row' },
@@ -789,7 +804,7 @@ function adminContent() {
     h('label', {}, label, h('textarea', { name: key, rows, value, maxlength: 2000,
       oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft[key] = ev.target.value; } }));
   return h('div', {},
-    nav,
+    contentMenu,
     h('section', { class: 'card admin' },
         h('h2', {}, 'Modifier les règles'),
         h('form', { class: 'content-form', onsubmit: saveRules },
@@ -805,18 +820,29 @@ function adminContent() {
           h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les règles'))));
 }
 
+function adminNavigation() {
+  return [['hunts', 'Shasses'], ['people', 'Joueurs'], ['content', 'Contenu']].map(([key, label]) =>
+    h('button', { class: 'admin-nav-button', 'aria-current': state.adminPage === key ? 'page' : null,
+      onclick: async () => {
+        state.adminPage = key;
+        state.adminHuntId = null;
+        state.page = 'bets';
+        if (key === 'people') await loadPeople();
+        render();
+      } }, label));
+}
+
 function adminView() {
-  const nav = h('div', { class: 'tabs' }, [['hunts', 'Shasses'], ['people', 'Joueurs'], ['content', 'Contenu']].map(([k, label]) =>
-    h('button', { class: 'tab' + (state.adminPage === k ? ' on' : ''), style: '--p:var(--twitch)',
-      onclick: async () => { state.adminPage = k; state.adminHuntId = null; if (k === 'people') await loadPeople(); render(); } }, h('b', {}, label))));
   const cur = state.adminHuntId ? state.hunts.find(x => x.id === state.adminHuntId) : null;
-  return h('div', {}, nav,
-    state.adminPage === 'content' ? adminContent() :
-        state.adminPage === 'people' ? adminPeople() : cur ? adminDetail(cur) : adminList());
+  return state.adminPage === 'content' ? adminContent() :
+    state.adminPage === 'people' ? adminPeople() : cur ? adminDetail(cur) : adminList();
 }
 
 function render() {
   renderAuth();
+  const adminMode = state.view === 'admin' && state.isAdmin;
+  $adminNav.hidden = !adminMode;
+  $adminNav.replaceChildren(...(adminMode ? adminNavigation() : []));
   for (const link of $nav.querySelectorAll('a')) {
     const page = pageFromHashForNav(link.hash);
     if (page === state.page) link.setAttribute('aria-current', 'page');

@@ -19,6 +19,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 | `supabase/migration-v10-contenu-admin.sql` | Édition admin des règles et des scores de départ (après la v9) |
 | `supabase/migration-v11-lien-classement.sql` | Le lien « ici » des règles ouvre le classement (après la v10) |
 | `supabase/migration-v12-contenu-classement.sql` | Édition des paragraphes et récompenses du classement (après la v11) |
+| `supabase/migration-v13-titre-classement.sql` | Édition du titre du classement (après la v12) |
 | `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
 | `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
 | `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
@@ -83,7 +84,7 @@ Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à 
 - Un pari enregistré ne peut **ni être modifié ni être supprimé** par son auteur. Seul un admin peut supprimer un pari (modération).
 - Le résultat se saisit par chasse : le classement s'affiche et les paris se ferment.
 
-**Si ta base existait déjà**, lance les migrations manquantes dans l'ordre. Pour activer le classement automatique et l'édition admin, lance les migrations v9, v10, v11, puis `supabase/migration-v12-contenu-classement.sql`, une seule fois chacune. Les résultats existants ne sont pas recomptés ; toute shasse terminée à partir de maintenant, y compris une shasse déjà en cours, sera prise en compte.
+**Si ta base existait déjà**, lance les migrations manquantes dans l'ordre. Pour activer le classement automatique et l'édition admin, lance les migrations v9 à v13, une seule fois chacune. Les résultats existants ne sont pas recomptés ; toute shasse terminée à partir de maintenant, y compris une shasse déjà en cours, sera prise en compte.
 
 ## Liens directs (commandes du chat)
 
