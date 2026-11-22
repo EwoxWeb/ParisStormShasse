@@ -127,13 +127,18 @@ async function placeBet(ev, huntId) {
 
 async function createHunt(ev) {
   ev.preventDefault();
-  const f = ev.target.elements;
+  const form = ev.target, f = form.elements;
   const row = { title: f.title.value.trim(), platform: f.platform.value };
   if (f.closes.value) row.closes_at = new Date(f.closes.value).toISOString();
   if (!row.title) return toast('Indique le Pokémon de la shasse.', 'err');
+  const file = f.image.files[0], bad = checkImage(file);
+  if (bad) return toast(bad, 'err');
+  try { if (file) row.image_path = await uploadImage(file); }
+  catch (e) { return toast('Envoi de l’image impossible : ' + e.message, 'err'); }
   const { data, error } = await sb.from('hunts').insert(row).select().single();
-  if (error) return toast('Création impossible : ' + error.message, 'err');
-  state.huntId = data.id; toast('Shasse créée.'); ev.target.reset(); refresh();
+  if (error) { removeImageFile(row.image_path); return toast('Création impossible : ' + error.message, 'err'); }
+  state.huntId = data.id; toast('Shasse créée.');
+  form.reset(); form.querySelector('img.preview').hidden = true; refresh();
 }
 async function setStatus(status) {
   const { error } = await sb.from('hunts').update({ status }).eq('id', state.huntId);
@@ -157,8 +162,10 @@ async function reopenResult() {
 }
 async function deleteHunt() {
   if (!confirm('Supprimer cette shasse et tous ses paris ? Action définitive.')) return;
+  const cur = hunt();
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
+  removeImageFile(cur?.image_path);
   state.huntId = null; state.adminHuntId = null; toast('Shasse supprimée.'); refresh();
 }
 async function deleteBet(id) {
@@ -166,6 +173,48 @@ async function deleteBet(id) {
   const { error } = await sb.from('bets').delete().eq('id', id);
   if (error) return toast(error.message, 'err');
   refresh();
+}
+
+/* ---------- images de shasse (Supabase Storage, bucket public « pokemon ») ---------- */
+const IMG_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+const ACCEPT_IMG = Object.keys(IMG_TYPES).join(',');
+const MAX_IMG = 2 * 1024 * 1024;
+const IMG_PATH_RE = /^[0-9a-f-]{36}\.(png|jpg|jpeg|gif|webp)$/;
+const imgUrl = x => (x && IMG_PATH_RE.test(x.image_path || '')) ? SUPABASE_URL + '/storage/v1/object/public/pokemon/' + x.image_path : '';
+const huntImg = x => imgUrl(x) && h('img', { class: 'poke', src: imgUrl(x), alt: x.title, loading: 'lazy', referrerpolicy: 'no-referrer' });
+function checkImage(file) {
+  if (!file) return null;
+  if (!IMG_TYPES[file.type]) return 'Format non accepté : PNG, JPG, GIF ou WebP uniquement.';
+  if (file.size > MAX_IMG) return 'Image trop lourde (2 Mo maximum).';
+  return null;
+}
+async function uploadImage(file) {
+  const path = crypto.randomUUID() + '.' + IMG_TYPES[file.type];
+  const { error } = await sb.storage.from('pokemon').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' });
+  if (error) throw error;
+  return path;
+}
+const removeImageFile = path => { if (path) sb.storage.from('pokemon').remove([path]).catch(() => {}); };
+function previewImage(ev) {
+  const file = ev.target.files[0], img = ev.target.form.querySelector('img.preview'), bad = checkImage(file);
+  if (!file || bad) { img.hidden = true; if (bad) { toast(bad, 'err'); ev.target.value = ''; } return; }
+  const fr = new FileReader(); fr.onload = () => { img.src = fr.result; img.hidden = false; }; fr.readAsDataURL(file);
+}
+async function changeImage(ev, cur) {
+  ev.preventDefault();
+  const file = ev.target.elements.image.files[0], bad = checkImage(file);
+  if (!file || bad) return toast(bad || 'Choisis une image.', 'err');
+  let path;
+  try { path = await uploadImage(file); } catch (e) { return toast('Envoi de l’image impossible : ' + e.message, 'err'); }
+  const { error } = await sb.from('hunts').update({ image_path: path }).eq('id', cur.id);
+  if (error) { removeImageFile(path); return toast(error.message, 'err'); }
+  removeImageFile(cur.image_path); toast('Image mise à jour.'); refresh();
+}
+async function removeHuntImage(cur) {
+  if (!confirm('Retirer l’image de cette shasse ?')) return;
+  const { error } = await sb.from('hunts').update({ image_path: null }).eq('id', cur.id);
+  if (error) return toast(error.message, 'err');
+  removeImageFile(cur.image_path); refresh();
 }
 
 /* ---------- admin : paris manuels et fusion de joueurs ---------- */
@@ -305,7 +354,7 @@ function huntSection(cur) {
 
   return h('section', { class: 'card plat', style: '--p:' + p.color },
     h('div', { class: 'plat-head' },
-      h('h2', {}, cur.title),
+      h('div', { class: 'hunt-id' }, huntImg(cur), h('h2', {}, cur.title)),
       h('span', { class: 'badge ' + (done ? 'finished' : open ? 'open' : '') }, done ? 'Terminée' : open ? 'Paris ouverts' : 'Paris fermés')),
     sub && h('div', { class: 'sub', style: 'margin-bottom:10px' }, sub),
     top,
@@ -320,6 +369,8 @@ function huntSection(cur) {
 function createForm() {
   return h('form', { onsubmit: createHunt },
     h('label', {}, 'Pokémon', h('input', { name: 'title', maxlength: 80, placeholder: 'Dracaufeu', required: true })),
+    h('label', {}, 'Image ou GIF (option, 2 Mo max)', h('input', { name: 'image', type: 'file', accept: ACCEPT_IMG, onchange: previewImage })),
+    h('img', { class: 'poke preview', alt: 'Aperçu', hidden: true }),
     h('label', {}, 'Fermeture auto (option)', h('input', { name: 'closes', type: 'datetime-local' })),
     h('div', { class: 'consoles' },
       PLATFORMS.map((p, i) => h('label', { class: 'chk' }, h('input', { type: 'radio', name: 'platform', value: p.key, checked: i === 0 }), p.label))),
@@ -356,7 +407,7 @@ function adminDetail(cur) {
   return h('div', {},
     h('button', { class: 'back', onclick: closeAdminHunt }, '← Toutes les shasses'),
     h('section', { class: 'card plat', style: '--p:' + p.color },
-      h('div', { class: 'plat-head' }, h('h2', {}, cur.title), h('span', { class: 'badge ' + statusClass(cur) }, statusLabel(cur))),
+      h('div', { class: 'plat-head' }, h('div', { class: 'hunt-id' }, huntImg(cur), h('h2', {}, cur.title)), h('span', { class: 'badge ' + statusClass(cur) }, statusLabel(cur))),
       h('dl', { class: 'info' },
         info('Console', p.label),
         info('Créée le', fmtDate(cur.created_at)),
@@ -375,6 +426,10 @@ function adminDetail(cur) {
         : h('form', { onsubmit: finishHunt },
             h('label', {}, 'Nombre final de rencontres', h('input', { name: 'result', type: 'number', min: 1, step: 1, required: true })),
             h('button', { class: 'gold', type: 'submit' }, 'Valider le résultat')),
+      h('form', { onsubmit: ev => changeImage(ev, cur) },
+        h('label', {}, 'Image ou GIF du Pokémon', h('input', { name: 'image', type: 'file', accept: ACCEPT_IMG, required: true })),
+        h('button', { type: 'submit' }, cur.image_path ? 'Remplacer l’image' : 'Ajouter l’image')),
+      cur.image_path && h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: () => removeHuntImage(cur) }, 'Retirer l’image')),
       h('div', { class: 'actions' }, h('button', { class: 'danger', onclick: deleteHunt }, 'Supprimer cette shasse'))),
     !done && cur.status !== 'finished' && h('section', { class: 'card admin' },
       h('h2', {}, 'Ajouter un pari à la main'),

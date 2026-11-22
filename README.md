@@ -14,6 +14,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 | `SECURITY.md` | Checklist sécurité et tests d'attaque |
 | `supabase/migration-v6-securite.sql` | Durcissement sécurité (à lancer après la v5) |
 | `supabase/migration-v7-joueurs-manuels.sql` | Paris ajoutés à la main + fusion avec les comptes Twitch (après la v6) |
+| `supabase/migration-v8-images.sql` | Image ou GIF du Pokémon sur chaque shasse (après la v7) |
 | `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
 | `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
 | `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
