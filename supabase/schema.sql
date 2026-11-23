@@ -328,13 +328,21 @@ create table public.site_content (
 insert into public.site_content (id, rules, leaderboard, leaderboard_content) values (
   1,
   '{
-    "intro": "Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.",
-    "commands": "Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.",
-    "form": "Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après. Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !",
-    "foxier": "Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.",
-    "purpose": "Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour les voir, écris “!top” dans le chat.",
+    "title": "Fonctionnement des paris chez NovaStorm",
+    "sections": [
+      {"title": "", "paragraphs": [{"text": "Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.", "highlight": false, "lead": ""}], "items": [], "listStyle": "none"},
+      {"title": "Comment parier ?", "paragraphs": [
+        {"text": "Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.", "highlight": false, "lead": ""},
+        {"text": "Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après. Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !", "highlight": false, "lead": ""},
+        {"text": "Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.", "highlight": false, "lead": "Nouveauté : "}
+      ], "items": [], "listStyle": "none"},
+      {"title": "Mais… à quoi ça sert ?", "paragraphs": [{"text": "Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour les voir, écris “!top” dans le chat.", "highlight": false, "lead": ""}], "items": [], "listStyle": "none"}
+    ],
+    "linkPrefix": "Ou clique ",
+    "linkText": "ici",
+    "linkSuffix": ".",
     "rewardsUrl": "https://ewoxweb.github.io/ParisStormShasse/#classement",
-    "closing": "Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !"
+    "footer": "Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !"
   }'::jsonb,
   '[
     {"name": "Finity", "points": 10},
@@ -344,18 +352,32 @@ insert into public.site_content (id, rules, leaderboard, leaderboard_content) va
   ]'::jsonb,
   '{
     "title": "Classement des paris — Saison 2",
-    "paragraphs": [
-      {"text": "Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !", "highlight": false},
-      {"text": "NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.", "highlight": true}
+    "sections": [
+      {"title": "", "paragraphs": [
+        {"text": "Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !", "highlight": false, "lead": ""},
+        {"text": "Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.", "highlight": true, "lead": "NOUVEAU : "}
+      ], "items": [], "listStyle": "none"},
+      {"title": "Récompenses pour les 6 premiers", "paragraphs": [], "items": [
+        "Un grade VIP à vie sur la chaîne.",
+        "Un sub offert (1 mois).",
+        "Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).",
+        "Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).",
+        "Une carte cadeau Nintendo de 10 €.",
+        "Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable)."
+      ], "listStyle": "ordered"},
+      {"title": "Attribution des points", "paragraphs": [], "items": [
+        "Nombre pile = 5 points",
+        "1er = 3 points",
+        "2ème = 2 points",
+        "3ème = 1 point"
+      ], "listStyle": "unordered"},
+      {"title": "", "paragraphs": [{"text": "Utilise la commande Ctrl+F puis tape ton pseudo pour te trouver dans la liste !", "highlight": false, "lead": ""}], "items": [], "listStyle": "none"}
     ],
-    "rewards": [
-      "Un grade VIP à vie sur la chaîne.",
-      "Un sub offert (1 mois).",
-      "Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).",
-      "Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).",
-      "Une carte cadeau Nintendo de 10 €.",
-      "Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable)."
-    ]
+    "scoreTitle": "Classement",
+    "winnerTemplate": "Seuil des 35 points atteint par {name} ({points} points) !",
+    "scoreLabelTemplate": "{points} pts",
+    "emptyScoreText": "—",
+    "scoreHint": "Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement."
   }'::jsonb
 );
 

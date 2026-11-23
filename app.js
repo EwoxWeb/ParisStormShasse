@@ -111,7 +111,7 @@ async function loadSiteContent() {
   }
   state.siteContentErrorShown = false;
   if (data) state.siteContent = {
-    rules: { ...DEFAULT_RULES, ...data.rules },
+    rules: validRulesContent(data.rules),
     leaderboard: validBaseline(data.leaderboard),
     leaderboardContent: validLeaderboardContent(data.leaderboard_content),
   };
@@ -317,46 +317,146 @@ const SEASON_BASELINE = [
   { name: 'Ewox', points: 2 },
 ];
 const DEFAULT_RULES = {
-  intro: 'Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.',
-  commands: 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.',
-  form: 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après. Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !',
-  foxier: 'Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.',
-  purpose: 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour les voir, écris “!top” dans le chat.',
+  title: 'Fonctionnement des paris chez NovaStorm',
+  sections: [
+    {
+      title: '',
+      paragraphs: [{
+        text: 'Je shasse presque toujours avec 2 consoles différentes (Switch à gauche et DS/3DS à droite). Tu peux donc parier 2 chiffres pour chacune de mes deux shasses et ce n’importe quand.',
+        highlight: false,
+        lead: '',
+      }],
+      items: [],
+      listStyle: 'none',
+    },
+    {
+      title: 'Comment parier ?',
+      paragraphs: [
+        { text: 'Pour parier, il te suffit d’écrire “!sw” pour la shasse en cours sur Switch ou bien “!ds” pour celle sur 3DS/DS.', highlight: false, lead: '' },
+        { text: 'Le bot va alors te répondre en te donnant un lien. Clique dessus : tu vas atterrir sur un formulaire dans lequel tu devras entrer ton pseudo Twitch, ainsi que les deux chiffres sur lesquels tu paries. Tu peux mettre n’importe quels chiffres mais choisis bien ! Tu ne pourras plus les modifier après. Clique sur “Valider mon pari” et voilà ! Ton pari est enregistré !', highlight: false, lead: '' },
+        { text: 'Il m’arrive parfois de shasser avec un ami, Foxier. Tu pourras également parier sur ses shasses avec la commande “!fx”.', highlight: false, lead: 'Nouveauté : ' },
+      ],
+      items: [],
+      listStyle: 'none',
+    },
+    {
+      title: 'Mais… à quoi ça sert ?',
+      paragraphs: [{
+        text: 'Bon déjà… pour le fun ! Et puis tu peux aussi gagner des récompenses qui en valent la peine ! Pour les voir, écris “!top” dans le chat.',
+        highlight: false,
+        lead: '',
+      }],
+      items: [],
+      listStyle: 'none',
+    },
+  ],
+  linkPrefix: 'Ou clique ',
+  linkText: 'ici',
+  linkSuffix: '.',
   rewardsUrl: 'https://ewoxweb.github.io/ParisStormShasse/#classement',
-  closing: 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !',
+  footer: 'Les résultats de chaque pari seront toujours affichés en live. Si tu as des questions, le chat du live est fait pour ça !',
 };
 const DEFAULT_LEADERBOARD_CONTENT = {
   title: 'Classement des paris — Saison 2',
-  paragraphs: [
-    { text: 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !', highlight: false },
-    { text: 'NOUVEAU : Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.', highlight: true },
+  sections: [
+    {
+      title: '',
+      paragraphs: [
+        { text: 'Voici le classement des paris, soyez le premier à atteindre 35 points pour mettre fin à la Saison 2 !', highlight: false, lead: '' },
+        { text: 'Désormais il m’arrivera de shasser avec un ami (Foxier), vous pouvez également parier sur ses shasses.', highlight: true, lead: 'NOUVEAU : ' },
+      ],
+      items: [],
+      listStyle: 'none',
+    },
+    {
+      title: 'Récompenses pour les 6 premiers',
+      paragraphs: [],
+      items: [
+        'Un grade VIP à vie sur la chaîne.',
+        'Un sub offert (1 mois).',
+        'Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).',
+        'Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).',
+        'Une carte cadeau Nintendo de 10 €.',
+        'Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable).',
+      ],
+      listStyle: 'ordered',
+    },
+    {
+      title: 'Attribution des points',
+      paragraphs: [],
+      items: ['Nombre pile = 5 points', '1er = 3 points', '2ème = 2 points', '3ème = 1 point'],
+      listStyle: 'unordered',
+    },
+    {
+      title: '',
+      paragraphs: [{ text: 'Utilise la commande Ctrl+F puis tape ton pseudo pour te trouver dans la liste !', highlight: false, lead: '' }],
+      items: [],
+      listStyle: 'none',
+    },
   ],
-  rewards: [
-    'Un grade VIP à vie sur la chaîne.',
-    'Un sub offert (1 mois).',
-    'Gagne ta place dans le prochain Battle Royal (avec Foxier, moi et quelqu’un tiré au sort).',
-    'Choisis un jeu/fan game Pokémon que je ferai en stream (seul ou avec Foxier).',
-    'Une carte cadeau Nintendo de 10 €.',
-    'Impose-moi un défi pour une prochaine shasse (dans la limite du raisonnable).',
-  ],
+  scoreTitle: 'Classement',
+  winnerTemplate: 'Seuil des 35 points atteint par {name} ({points} points) !',
+  scoreLabelTemplate: '{points} pts',
+  emptyScoreText: '—',
+  scoreHint: 'Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement.',
 };
+function cloneSections(sections) {
+  return sections.map(section => ({
+    title: section.title,
+    paragraphs: section.paragraphs.map(paragraph => ({ ...paragraph })),
+    items: [...section.items],
+    listStyle: section.listStyle,
+  }));
+}
+function defaultRulesContent() {
+  return {
+    ...DEFAULT_RULES,
+    sections: cloneSections(DEFAULT_RULES.sections),
+  };
+}
 function defaultLeaderboardContent() {
   return {
-    title: DEFAULT_LEADERBOARD_CONTENT.title,
-    paragraphs: DEFAULT_LEADERBOARD_CONTENT.paragraphs.map(p => ({ ...p })),
-    rewards: [...DEFAULT_LEADERBOARD_CONTENT.rewards],
+    ...DEFAULT_LEADERBOARD_CONTENT,
+    sections: cloneSections(DEFAULT_LEADERBOARD_CONTENT.sections),
+  };
+}
+function validContentSections(value, fallback) {
+  if (!Array.isArray(value) || !value.every(section => section && typeof section.title === 'string'
+    && Array.isArray(section.paragraphs) && section.paragraphs.every(paragraph =>
+      paragraph && typeof paragraph.text === 'string' && typeof paragraph.highlight === 'boolean'
+      && typeof paragraph.lead === 'string')
+    && Array.isArray(section.items) && section.items.every(item => typeof item === 'string')
+    && ['none', 'ordered', 'unordered'].includes(section.listStyle))) {
+    return cloneSections(fallback);
+  }
+  return cloneSections(value);
+}
+function validRulesContent(value) {
+  if (!value || typeof value.title !== 'string' || typeof value.linkPrefix !== 'string'
+    || typeof value.linkText !== 'string' || typeof value.linkSuffix !== 'string'
+    || typeof value.rewardsUrl !== 'string' || typeof value.footer !== 'string') return defaultRulesContent();
+  return {
+    title: value.title,
+    sections: validContentSections(value.sections, DEFAULT_RULES.sections),
+    linkPrefix: value.linkPrefix,
+    linkText: value.linkText,
+    linkSuffix: value.linkSuffix,
+    rewardsUrl: value.rewardsUrl,
+    footer: value.footer,
   };
 }
 function validLeaderboardContent(value) {
-  if (!value || !Array.isArray(value.paragraphs)
-    || !value.paragraphs.every(p => p && typeof p.text === 'string' && typeof p.highlight === 'boolean')
-    || !Array.isArray(value.rewards) || !value.rewards.every(reward => typeof reward === 'string')) {
-    return defaultLeaderboardContent();
-  }
+  if (!value || typeof value.title !== 'string' || typeof value.scoreTitle !== 'string'
+    || typeof value.winnerTemplate !== 'string' || typeof value.scoreLabelTemplate !== 'string'
+    || typeof value.emptyScoreText !== 'string' || typeof value.scoreHint !== 'string') return defaultLeaderboardContent();
   return {
-    title: typeof value.title === 'string' ? value.title : DEFAULT_LEADERBOARD_CONTENT.title,
-    paragraphs: value.paragraphs,
-    rewards: value.rewards,
+    title: value.title,
+    sections: validContentSections(value.sections, DEFAULT_LEADERBOARD_CONTENT.sections),
+    scoreTitle: value.scoreTitle,
+    winnerTemplate: value.winnerTemplate,
+    scoreLabelTemplate: value.scoreLabelTemplate,
+    emptyScoreText: value.emptyScoreText,
+    scoreHint: value.scoreHint,
   };
 }
 function validBaseline(value) {
@@ -366,7 +466,7 @@ function validBaseline(value) {
   return value;
 }
 const siteContent = () => state.siteContent || {
-  rules: DEFAULT_RULES,
+  rules: defaultRulesContent(),
   leaderboard: SEASON_BASELINE,
   leaderboardContent: DEFAULT_LEADERBOARD_CONTENT,
 };
@@ -428,7 +528,7 @@ async function saveSiteContent(patch, successMessage) {
   if (error) return toast('Enregistrement impossible : ' + error.message, 'err');
   if (!data) return toast('Réglages introuvables. Vérifie que la migration v10 a été exécutée.', 'err');
   state.siteContent = {
-    rules: { ...DEFAULT_RULES, ...data.rules },
+    rules: validRulesContent(data.rules),
     leaderboard: validBaseline(data.leaderboard),
     leaderboardContent: validLeaderboardContent(data.leaderboard_content),
   };
@@ -439,23 +539,112 @@ async function saveSiteContent(patch, successMessage) {
   render();
 }
 
+function rulesContentDraft() {
+  if (!state.rulesDraft) {
+    const rules = validRulesContent(siteContent().rules);
+    state.rulesDraft = { ...rules, sections: cloneSections(rules.sections) };
+  }
+  return state.rulesDraft;
+}
+
+function renderContentSectionsEditor(sections) {
+  return h('div', { class: 'content-sections-edit' },
+    sections.map((section, sectionIndex) =>
+      h('section', { class: 'content-section-edit' },
+        h('div', { class: 'content-section-heading' },
+          h('label', {}, 'Titre de section',
+            h('input', { type: 'text', maxlength: 120, value: section.title,
+              oninput: ev => { sections[sectionIndex].title = ev.target.value; } })),
+          h('button', { class: 'danger', type: 'button',
+            onclick: () => { sections.splice(sectionIndex, 1); render(); } }, 'Supprimer la section')),
+        h('h4', {}, 'Paragraphes'),
+        section.paragraphs.map((paragraph, paragraphIndex) =>
+          h('div', { class: 'content-paragraph-edit' },
+            h('label', {}, 'Texte',
+              h('textarea', { maxlength: 2000, value: paragraph.text,
+                oninput: ev => { sections[sectionIndex].paragraphs[paragraphIndex].text = ev.target.value; } })),
+            h('label', {}, 'Texte en gras au début (facultatif)',
+              h('input', { type: 'text', maxlength: 100, value: paragraph.lead,
+                oninput: ev => { sections[sectionIndex].paragraphs[paragraphIndex].lead = ev.target.value; } })),
+            h('label', { class: 'chk' },
+              h('input', { type: 'checkbox', checked: paragraph.highlight,
+                onchange: ev => { sections[sectionIndex].paragraphs[paragraphIndex].highlight = ev.target.checked; } }),
+              'Mettre en évidence'),
+            h('button', { class: 'danger', type: 'button',
+              onclick: () => { sections[sectionIndex].paragraphs.splice(paragraphIndex, 1); render(); } }, 'Supprimer le paragraphe'))),
+        h('button', { type: 'button', onclick: () => {
+          sections[sectionIndex].paragraphs.push({ text: '', highlight: false, lead: '' });
+          render();
+        } }, 'Ajouter un paragraphe'),
+        h('h4', {}, 'Liste (facultative)'),
+        h('label', {}, 'Présentation de la liste',
+          h('select', { onchange: ev => { sections[sectionIndex].listStyle = ev.target.value; } },
+            [['none', 'Aucune liste'], ['unordered', 'À puces'], ['ordered', 'Numérotée']]
+              .map(([value, label]) => h('option', { value, selected: section.listStyle === value }, label)))),
+        section.items.map((item, itemIndex) =>
+          h('div', { class: 'content-list-item-edit' },
+            h('label', {}, 'Élément ' + (itemIndex + 1),
+              h('input', { type: 'text', maxlength: 500, value: item,
+                oninput: ev => { sections[sectionIndex].items[itemIndex] = ev.target.value; } })),
+            h('button', { class: 'danger', type: 'button',
+              onclick: () => { sections[sectionIndex].items.splice(itemIndex, 1); render(); } }, 'Supprimer'))),
+        h('button', { type: 'button', onclick: () => {
+          sections[sectionIndex].items.push('');
+          if (sections[sectionIndex].listStyle === 'none') sections[sectionIndex].listStyle = 'unordered';
+          render();
+        } }, 'Ajouter un élément de liste'))),
+    h('button', { type: 'button', onclick: () => { sections.push({ title: '', paragraphs: [], items: [], listStyle: 'none' }); render(); } },
+      'Ajouter une section'));
+}
+
+function cleanContentSections(sections) {
+  for (const section of sections) {
+    if (section.title.trim().length > 120) throw new Error('Un titre de section dépasse 120 caractères.');
+    for (const paragraph of section.paragraphs) {
+      if (!paragraph.text.trim() || paragraph.text.trim().length > 2000) throw new Error('Chaque paragraphe doit contenir de 1 à 2 000 caractères.');
+      if (paragraph.lead.trim().length > 100) throw new Error('Le texte en gras est limité à 100 caractères.');
+    }
+    for (const item of section.items) {
+      if (!item.trim() || item.trim().length > 500) throw new Error('Chaque élément de liste doit contenir de 1 à 500 caractères.');
+    }
+    if (section.items.length && section.listStyle === 'none') throw new Error('Choisis un affichage pour chaque liste.');
+  }
+  return sections.map(section => ({
+    title: section.title.trim(),
+    paragraphs: section.paragraphs.map(paragraph => ({
+      text: paragraph.text.trim(),
+      highlight: !!paragraph.highlight,
+      lead: paragraph.lead.trim(),
+    })),
+    items: section.items.map(item => item.trim()),
+    listStyle: section.listStyle,
+  }));
+}
+
 async function saveRules(ev) {
   ev.preventDefault();
-  const f = ev.target.elements;
-  const rules = {};
-  for (const key of ['intro', 'commands', 'foxier', 'purpose', 'closing']) rules[key] = f[key].value.trim();
-  rules.form = f.betInstructions.value.trim();
-  const rewardsUrl = f.rewardsUrl.value.trim();
-  if (rewardsUrl) {
+  const draft = rulesContentDraft();
+  const rules = { ...draft };
+  if (!rules.title.trim() || rules.title.trim().length > 120) return toast('Le titre doit contenir de 1 à 120 caractères.', 'err');
+  if (rules.footer.trim().length > 2000) return toast('Le texte de fin est limité à 2 000 caractères.', 'err');
+  if (rules.linkPrefix.length > 200 || rules.linkText.length > 100 || rules.linkSuffix.length > 200) {
+    return toast('Les textes autour du lien sont trop longs.', 'err');
+  }
+  try { rules.sections = cleanContentSections(draft.sections); }
+  catch (error) { return toast(error.message, 'err'); }
+  if (rules.rewardsUrl.trim()) {
     try {
-      const url = new URL(rewardsUrl);
+      const url = new URL(rules.rewardsUrl.trim());
       if (url.protocol !== 'https:') throw new Error('https requis');
       rules.rewardsUrl = url.href;
     } catch {
       return toast('Le lien des récompenses doit être une URL HTTPS valide.', 'err');
     }
   } else rules.rewardsUrl = '';
-  await saveSiteContent({ rules }, 'Règles mises à jour.');
+  rules.title = rules.title.trim();
+  rules.footer = rules.footer.trim();
+  rules.linkText = rules.linkText.trim();
+  await saveSiteContent({ rules }, 'Contenu des règles mis à jour.');
 }
 
 function baselineDraft() {
@@ -553,8 +742,12 @@ function leaderboardContentDraft() {
     const content = validLeaderboardContent(siteContent().leaderboardContent);
     state.leaderboardContentDraft = {
       title: content.title,
-      paragraphs: content.paragraphs.map(p => ({ ...p })),
-      rewards: [...content.rewards],
+      sections: cloneSections(content.sections),
+      scoreTitle: content.scoreTitle,
+      winnerTemplate: content.winnerTemplate,
+      scoreLabelTemplate: content.scoreLabelTemplate,
+      emptyScoreText: content.emptyScoreText,
+      scoreHint: content.scoreHint,
     };
   }
   return state.leaderboardContentDraft;
@@ -564,33 +757,50 @@ async function saveLeaderboardContent(ev) {
   ev.preventDefault();
   const draft = leaderboardContentDraft();
   const title = draft.title.trim();
-  const paragraphs = draft.paragraphs.map(p => ({ text: p.text.trim(), highlight: !!p.highlight }));
-  const rewards = draft.rewards.map(reward => reward.trim());
   if (!title || title.length > 120) {
     return toast('Le titre doit contenir entre 1 et 120 caractères.', 'err');
   }
-  if (paragraphs.some(p => !p.text || p.text.length > 2000)) {
-    return toast('Chaque paragraphe doit contenir entre 1 et 2 000 caractères.', 'err');
+  if (!draft.scoreTitle.trim() || draft.scoreTitle.length > 120 || draft.winnerTemplate.length > 300
+    || !draft.winnerTemplate.includes('{name}') || !draft.winnerTemplate.includes('{points}')
+    || draft.scoreLabelTemplate.length > 100 || !draft.scoreLabelTemplate.includes('{points}')
+    || draft.emptyScoreText.length > 100 || draft.scoreHint.length > 1000) {
+    return toast('Vérifie les titres, modèles de texte et indications du classement.', 'err');
   }
-  if (rewards.some(reward => !reward || reward.length > 500)) {
-    return toast('Chaque récompense doit contenir entre 1 et 500 caractères.', 'err');
-  }
-  await saveSiteContent({ leaderboardContent: { title, paragraphs, rewards } }, 'Texte du classement mis à jour.');
+  let sections;
+  try { sections = cleanContentSections(draft.sections); }
+  catch (error) { return toast(error.message, 'err'); }
+  await saveSiteContent({
+    leaderboardContent: {
+      title,
+      sections,
+      scoreTitle: draft.scoreTitle.trim(),
+      winnerTemplate: draft.winnerTemplate.trim(),
+      scoreLabelTemplate: draft.scoreLabelTemplate.trim(),
+      emptyScoreText: draft.emptyScoreText.trim(),
+      scoreHint: draft.scoreHint.trim(),
+    },
+  }, 'Contenu du classement mis à jour.');
+}
+
+function renderContentSections(sections) {
+  return sections.map(section => h('section', { class: 'info-section' },
+    section.title && h('h2', {}, section.title),
+    section.paragraphs.map(paragraph => h('p', { class: paragraph.highlight ? 'notice' : null },
+      paragraph.lead && h('strong', {}, paragraph.lead),
+      paragraph.text)),
+    section.items.length && section.listStyle !== 'none'
+      ? h(section.listStyle === 'ordered' ? 'ol' : 'ul', { class: 'rewards' },
+          section.items.map(item => h('li', {}, item)))
+      : null));
 }
 
 function rulesPage() {
-  const rules = siteContent().rules;
+  const rules = validRulesContent(siteContent().rules);
   return h('article', { class: 'card info-page' },
-    h('h1', {}, 'Fonctionnement des paris chez NovaStorm'),
-    rules.intro && h('p', {}, rules.intro),
-    h('h2', {}, 'Comment parier ?'),
-    rules.commands && h('p', {}, rules.commands),
-    rules.form && h('p', {}, rules.form),
-    rules.foxier && h('p', {}, h('strong', {}, 'Nouveauté : '), rules.foxier),
-    h('h2', {}, 'Mais… à quoi ça sert ?'),
-    rules.purpose && h('p', {}, rules.purpose),
-    rules.rewardsUrl && h('p', {}, 'Ou clique ', h('a', { href: rules.rewardsUrl }, 'ici'), '.'),
-    rules.closing && h('p', {}, rules.closing));
+    h('h1', {}, rules.title),
+    ...renderContentSections(rules.sections),
+    rules.rewardsUrl && rules.linkText && h('p', {}, rules.linkPrefix, h('a', { href: rules.rewardsUrl }, rules.linkText), rules.linkSuffix),
+    rules.footer && h('p', {}, rules.footer));
 }
 
 function leaderboardPage() {
@@ -606,27 +816,22 @@ function leaderboardPage() {
   return h('div', {},
     h('section', { class: 'card info-page' },
       h('h1', {}, content.title),
-      ...content.paragraphs.map(p => h('p', { class: p.highlight ? 'notice' : null }, p.text)),
-      h('h2', {}, 'Récompenses pour les 6 premiers'),
-      h('ol', { class: 'rewards' },
-        content.rewards.map(text => h('li', {}, text))),
-      h('h2', {}, 'Attribution des points'),
-      h('ul', { class: 'points-list' },
-        ['Nombre pile = 5 points', '1er = 3 points', '2ème = 2 points', '3ème = 1 point'].map(text => h('li', {}, text))),
-      h('p', { class: 'hint' }, 'Utilise la commande Ctrl+F puis tape ton pseudo pour te trouver dans la liste !')),
+      ...renderContentSections(content.sections)),
     h('section', { class: 'card' },
-      h('h2', {}, 'Classement'),
-      winner && h('p', { class: 'notice' }, 'Seuil des 35 points atteint par ', h('strong', {}, winner.name), ' (', winner.points, ' points) !'),
+      h('h2', {}, content.scoreTitle),
+      winner && h('p', { class: 'notice' }, content.winnerTemplate
+        .replaceAll('{name}', winner.name)
+        .replaceAll('{points}', String(winner.points))),
       h('div', { class: 'standings' }, scoreBuckets.map(([points, bucket]) =>
         h('div', { class: 'standing' },
-          h('span', { class: 'standing-points' }, points + ' pts'),
+          h('span', { class: 'standing-points' }, content.scoreLabelTemplate.replaceAll('{points}', String(points))),
           h('div', { class: 'standing-players' }, bucket.length
             ? bucket.map(p => h('div', { class: 'who standing-user' + (podium.has(p.points) ? ' podium-' + podium.get(p.points) : '') },
                 safeAvatar(p.avatar) && h('img', { src: safeAvatar(p.avatar), alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }),
                 h('span', {}, p.name),
                 p.points > 35 && h('small', {}, ' (' + p.points + ' pts)')))
-            : '—')))),
-      h('p', { class: 'hint' }, 'Les scores de départ sont conservés ; les points des nouvelles shasses terminées sont ajoutés automatiquement.')));
+            : content.emptyScoreText)))),
+      content.scoreHint && h('p', { class: 'hint' }, content.scoreHint)));
 }
 
 function playerRow(p, rank, result, maxDiff) {
@@ -818,7 +1023,7 @@ function adminPeople() {
 }
 
 function adminContent() {
-  const rules = state.rulesDraft || siteContent().rules;
+  const rules = rulesContentDraft();
   const draft = baselineDraft();
 
   if (state.contentPage === 'leaderboard') {
@@ -843,62 +1048,53 @@ function adminContent() {
 
   if (state.contentPage === 'rankingContent') {
     const content = leaderboardContentDraft();
+    const textInput = (label, key, maxLength) => h('label', {}, label,
+      h('input', { type: 'text', maxlength: maxLength, value: content[key],
+        oninput: ev => { content[key] = ev.target.value; } }));
+    const textArea = (label, key, maxLength, rows) => h('label', {}, label,
+      h('textarea', { maxlength: maxLength, rows, value: content[key],
+        oninput: ev => { content[key] = ev.target.value; } }));
     return h('div', {},
       h('section', { class: 'card admin' },
-        h('h2', {}, 'Texte de la page Classement'),
-        h('p', { class: 'hint' }, 'Modifie le titre, les paragraphes affichés au-dessus des scores et les récompenses. Le barème reste fixe.'),
+        h('h2', {}, 'Contenu de la page Classement'),
+        h('p', { class: 'hint' }, 'Tu peux modifier tous les textes, titres, sections et listes. Les variables des modèles sont remplacées automatiquement.'),
         h('form', { class: 'content-form', onsubmit: saveLeaderboardContent },
-          h('label', {}, 'Titre du classement',
-            h('input', { type: 'text', maxlength: 120, value: content.title,
-              oninput: ev => { content.title = ev.target.value; } })),
-          h('h3', {}, 'Paragraphes'),
-          h('div', { class: 'ranking-edit-list' }, content.paragraphs.map((paragraph, index) =>
-            h('div', { class: 'ranking-edit-row' },
-              h('label', {}, 'Paragraphe ' + (index + 1),
-                h('textarea', { maxlength: 2000, value: paragraph.text,
-                  oninput: ev => { content.paragraphs[index].text = ev.target.value; } })),
-              h('div', { class: 'ranking-edit-actions' },
-                h('label', { class: 'chk' },
-                  h('input', { type: 'checkbox', checked: paragraph.highlight,
-                    onchange: ev => { content.paragraphs[index].highlight = ev.target.checked; } }),
-                  'Mettre en évidence'),
-                h('button', { class: 'danger', type: 'button',
-                  onclick: () => { content.paragraphs.splice(index, 1); render(); } }, 'Retirer'))))),
-          h('div', { class: 'actions' },
-            h('button', { type: 'button',
-              onclick: () => { content.paragraphs.push({ text: '', highlight: false }); render(); } }, 'Ajouter un paragraphe')),
-          h('hr'),
-          h('h3', {}, 'Récompenses'),
-          h('div', { class: 'ranking-edit-list' }, content.rewards.map((reward, index) =>
-            h('div', { class: 'ranking-edit-row' },
-              h('label', {}, 'Récompense ' + (index + 1),
-                h('input', { type: 'text', maxlength: 500, value: reward,
-                  oninput: ev => { content.rewards[index] = ev.target.value; } })),
-              h('button', { class: 'danger', type: 'button',
-                onclick: () => { content.rewards.splice(index, 1); render(); } }, 'Retirer')))),
-          h('div', { class: 'actions' },
-            h('button', { type: 'button',
-              onclick: () => { content.rewards.push(''); render(); } }, 'Ajouter une récompense'),
-            h('button', { class: 'gold', type: 'submit' }, 'Enregistrer le texte')))));
+            textInput('Titre de la page', 'title', 120),
+            h('h3', {}, 'Sections, paragraphes et listes'),
+            renderContentSectionsEditor(content.sections),
+            h('h3', {}, 'Zone du classement'),
+            textInput('Titre du tableau des scores', 'scoreTitle', 120),
+            textInput('Message quand un joueur atteint le seuil ({name}, {points})', 'winnerTemplate', 300),
+            textInput('Format de chaque palier ({points})', 'scoreLabelTemplate', 100),
+            textInput('Texte des paliers vides', 'emptyScoreText', 100),
+            textArea('Texte sous le classement', 'scoreHint', 1000, 3),
+            h('p', { class: 'hint' }, 'Les variables {name} et {points} peuvent être placées dans le message du seuil. {points} affiche le nombre de points dans les paliers.'),
+            h('button', { class: 'gold', type: 'submit' }, 'Enregistrer le texte'))));
   }
 
-  const field = (key, label, value, rows) =>
-    h('label', {}, label, h('textarea', { name: key, rows, value, maxlength: 2000,
-      oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft[key] = ev.target.value; } }));
+  const ruleInput = (label, key, maxLength) => h('label', {}, label,
+    h('input', { type: 'text', maxlength: maxLength, value: rules[key],
+      oninput: ev => { rules[key] = ev.target.value; } }));
+  const ruleArea = (label, key, maxLength, rows) => h('label', {}, label,
+    h('textarea', { maxlength: maxLength, rows, value: rules[key],
+      oninput: ev => { rules[key] = ev.target.value; } }));
   return h('div', {},
     h('section', { class: 'card admin' },
-        h('h2', {}, 'Modifier les règles'),
-        h('form', { class: 'content-form', onsubmit: saveRules },
-          field('intro', 'Présentation', rules.intro, 3),
-          field('commands', 'Commandes !sw et !ds', rules.commands, 2),
-          field('betInstructions', 'Instructions pour placer un pari', rules.form, 4),
-          field('foxier', 'Parier sur les shasses de Foxier', rules.foxier, 2),
-          field('purpose', 'Récompenses et commande !top', rules.purpose, 3),
-          h('label', {}, 'Lien des récompenses (HTTPS, facultatif)',
-            h('input', { name: 'rewardsUrl', type: 'url', value: rules.rewardsUrl, maxlength: 500,
-              oninput: ev => { if (!state.rulesDraft) state.rulesDraft = { ...siteContent().rules }; state.rulesDraft.rewardsUrl = ev.target.value; } })),
-          field('closing', 'Message de fin', rules.closing, 2),
-          h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les règles'))));
+      h('h2', {}, 'Contenu de la page Règles'),
+      h('p', { class: 'hint' }, 'Modifie le titre, ajoute ou retire des sections, paragraphes et éléments de liste.'),
+      h('form', { class: 'content-form', onsubmit: saveRules },
+        ruleInput('Titre de la page', 'title', 120),
+        h('h3', {}, 'Sections, paragraphes et listes'),
+        renderContentSectionsEditor(rules.sections),
+        h('h3', {}, 'Lien vers le classement'),
+        ruleInput('Texte avant le lien', 'linkPrefix', 200),
+        ruleInput('Texte du lien', 'linkText', 100),
+        ruleInput('Texte après le lien', 'linkSuffix', 200),
+        h('label', {}, 'Adresse HTTPS (laisser vide pour masquer le lien)',
+            h('input', { type: 'url', value: rules.rewardsUrl, maxlength: 500,
+              oninput: ev => { rules.rewardsUrl = ev.target.value; } })),
+        ruleArea('Texte de fin', 'footer', 2000, 3),
+        h('button', { class: 'gold', type: 'submit' }, 'Enregistrer les règles'))));
 }
 
 function adminNavigation() {

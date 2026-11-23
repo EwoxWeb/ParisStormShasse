@@ -23,6 +23,7 @@ Site de pronostics pour une chasse shiny Pokémon : les viewers se connectent av
 | `supabase/migration-v14-paris-groupes.sql` | Saisie atomique des deux paris (après la v13) |
 | `supabase/migration-v15-archive-points-shasse.sql` | Conserver les points si une shasse terminée est supprimée (après la v14) |
 | `supabase/migration-v16-historique-points.sql` | Historique détaillé des points et ajustement admin des totaux (après la v15) |
+| `supabase/migration-v17-edition-contenu-public.sql` | Édition complète des sections, textes et listes des pages publiques (après la v16) |
 | `supabase/schema.sql` | Tables et règles de sécurité (installation neuve, déjà en double chasse) |
 | `supabase/migration-v3-choix-consoles.sql` | Étape intermédiaire (à lancer avant la v4 si pas déjà fait) |
 | `supabase/migration-v4-une-console-deux-paris.sql` | Une chasse = une console, 2 paris max par chasse |
@@ -87,7 +88,7 @@ Le workflow `keepalive.yml` interroge la base chaque jour. Tu peux le tester à 
 - Un pari enregistré ne peut **ni être modifié ni être supprimé** par son auteur. Seul un admin peut supprimer un pari (modération).
 - Le résultat se saisit par chasse : le classement s'affiche et les paris se ferment.
 
-**Si ta base existait déjà**, lance les migrations manquantes dans l'ordre. Pour activer le classement automatique et l'édition admin, lance les migrations v9 à v16, une seule fois chacune. Les résultats existants ne sont pas recomptés ; toute shasse terminée à partir de maintenant, y compris une shasse déjà en cours, sera prise en compte. La v15 archive les points lorsqu'une shasse terminée est supprimée ; elle ne peut pas récupérer les points de shasses déjà supprimées auparavant.
+**Si ta base existait déjà**, lance les migrations manquantes dans l'ordre. Pour activer le classement automatique et l'édition admin, lance les migrations v9 à v17, une seule fois chacune. Les résultats existants ne sont pas recomptés ; toute shasse terminée à partir de maintenant, y compris une shasse déjà en cours, sera prise en compte. La v15 archive les points lorsqu'une shasse terminée est supprimée ; elle ne peut pas récupérer les points de shasses déjà supprimées auparavant.
 
 ## Liens directs (commandes du chat)
 
@@ -102,7 +103,7 @@ Le lien est à mettre dans la réponse des commandes de ton bot Twitch. Après l
 1. Créer une chasse (titre, Pokémon, fermeture automatique optionnelle).
 2. Fermer les paris quand tu veux, ou laisser la date de fermeture le faire.
 3. Quand le shiny tombe, saisir le nombre final de rencontres. Le classement s'affiche pour tout le monde.
-4. Dans **Admin > Contenu**, modifier les textes des règles ou gérer les pseudos et scores de départ. Les points gagnés sur les shasses restent calculés automatiquement.
+4. Dans **Admin > Contenu**, modifier, ajouter ou supprimer les sections, paragraphes, listes et textes des pages **Règles** et **Classement**. Les pseudos et scores de départ se gèrent séparément ; les points gagnés sur les shasses restent calculés automatiquement.
 
 **Viewers**
 1. Connexion Twitch, saisie du nombre pour chaque console, un pari par compte et par console, non modifiable.
