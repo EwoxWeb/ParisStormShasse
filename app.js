@@ -129,11 +129,21 @@ function login() {
 }
 async function logout() { await sb.auth.signOut(); }
 
-async function placeBet(ev, huntId) {
+async function placeBet(ev, huntId, remainingBets) {
   ev.preventDefault();
-  const guess = parseInt(ev.target.elements.guess.value, 10);
-  if (!Number.isInteger(guess) || guess < 1) return toast('Entre un nombre de rencontres supérieur à 0.', 'err');
-  const { error } = await sb.from('bets').insert({ hunt_id: huntId, guess });
+  const form = ev.target.elements;
+  const guesses = remainingBets === 2
+    ? [Number(form.guess1.value), Number(form.guess2.value)]
+    : [Number(form.guess.value)];
+  if (guesses.some(guess => !Number.isInteger(guess) || guess < 1 || guess > 10000000)) {
+    return toast('Entre un nombre entier de rencontres entre 1 et 10 000 000.', 'err');
+  }
+  if (guesses.length === 2 && guesses[0] === guesses[1]) {
+    return toast('Tes deux paris doivent être différents.', 'err');
+  }
+  const { error } = guesses.length === 2
+    ? await sb.rpc('place_two_bets', { p_hunt: huntId, p_guess1: guesses[0], p_guess2: guesses[1] })
+    : await sb.from('bets').insert({ hunt_id: huntId, guess: guesses[0] });
   if (error) {
     const m = error.message || '';
     if (m.includes('LIMITE_2_PARIS')) toast('Tu as déjà placé tes ' + MAX_BETS + ' paris sur cette shasse.', 'err');
@@ -143,7 +153,7 @@ async function placeBet(ev, huntId) {
     else toast('Erreur : ' + m, 'err');
     return refresh();
   }
-  toast('Pari enregistré. Bonne chance !');
+  toast(guesses.length === 2 ? 'Tes deux paris sont enregistrés. Bonne chance !' : 'Deuxième pari enregistré. Bonne chance !');
   refresh();
 }
 
@@ -593,9 +603,16 @@ function huntSection(cur) {
       h('button', { class: 'primary', onclick: login }, 'Se connecter avec Twitch'));
   } else if (left > 0) {
     top = h('div', {}, mineBlock,
-      h('form', { class: 'counter', onsubmit: ev => placeBet(ev, cur.id) },
-        h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: '0000', required: true, 'aria-label': 'Nombre de rencontres' }),
-        h('button', { class: 'gold', type: 'submit' }, 'Valider mon pari')),
+      h('form', { class: 'counter', onsubmit: ev => placeBet(ev, cur.id, left) },
+        left === 2
+          ? h('div', { class: 'counter-guesses' },
+              h('label', {}, 'Premier pari',
+                h('input', { name: 'guess1', type: 'number', inputmode: 'numeric', min: 1, max: 10000000, step: 1, placeholder: '0000', required: true, 'aria-label': 'Premier nombre de rencontres' })),
+              h('label', {}, 'Deuxième pari',
+                h('input', { name: 'guess2', type: 'number', inputmode: 'numeric', min: 1, max: 10000000, step: 1, placeholder: '0000', required: true, 'aria-label': 'Deuxième nombre de rencontres' })))
+          : h('label', { class: 'counter-remaining' }, 'Deuxième pari',
+              h('input', { name: 'guess', type: 'number', inputmode: 'numeric', min: 1, max: 10000000, step: 1, placeholder: '0000', required: true, 'aria-label': 'Deuxième nombre de rencontres' })),
+        h('button', { class: 'gold', type: 'submit' }, left === 2 ? 'Valider mes deux paris' : 'Valider mon deuxième pari')),
       h('div', { class: 'hint' }, 'Il te reste ' + left + (left > 1 ? ' paris' : ' pari') + ' sur ' + MAX_BETS + '. Un pari enregistré ne peut ni être modifié ni supprimé.'));
   } else {
     top = h('div', {}, mineBlock, h('div', { class: 'hint' }, 'Tu as placé tes ' + MAX_BETS + ' paris sur cette shasse.'));
