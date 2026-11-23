@@ -19,7 +19,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], archivedPoints: [], archivedPointsLoaded: false, tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], pointHistory: [], pointHistoryLoaded: false, tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -85,11 +85,11 @@ async function loadBets() {
   if (error) return toast('Impossible de charger les paris : ' + error.message, 'err');
   state.bets = data;
 }
-async function loadArchivedPoints() {
-  const { data, error } = await sb.from('hunt_points_archive').select('user_id, twitch_name, twitch_avatar, points');
-  if (error) return toast('Impossible de charger les points archivés : ' + error.message + ' (vérifie la migration v15).', 'err');
-  state.archivedPoints = data;
-  state.archivedPointsLoaded = true;
+async function loadPointHistory() {
+  const { data, error } = await sb.from('point_history').select('*').order('created_at', { ascending: false });
+  if (error) return toast('Impossible de charger l’historique des points : ' + error.message + ' (vérifie la migration v16).', 'err');
+  state.pointHistory = data;
+  state.pointHistoryLoaded = true;
 }
 async function loadAdmin() {
   state.isAdmin = false;
@@ -116,7 +116,7 @@ async function loadSiteContent() {
     leaderboardContent: validLeaderboardContent(data.leaderboard_content),
   };
 }
-async function refresh() { await loadHunts(); await loadBets(); await loadArchivedPoints(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
+async function refresh() { await loadHunts(); await loadBets(); await loadPointHistory(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
 
 /* navigation du panel admin */
 async function toggleAdmin() {
@@ -200,8 +200,8 @@ async function reopenResult() {
 }
 async function deleteHunt() {
   const cur = hunt();
-  if (cur?.result != null && cur.result_at && new Date(cur.result_at) >= new Date(SEASON_START_AT) && !state.archivedPointsLoaded) {
-    return toast('Suppression bloquée : les points ne peuvent pas être archivés. Vérifie que la migration v15 est installée.', 'err');
+  if (cur?.result != null && cur.result_at && new Date(cur.result_at) >= new Date(SEASON_START_AT) && !state.pointHistoryLoaded) {
+    return toast('Suppression bloquée : l’historique des points est indisponible. Vérifie que la migration v16 est installée.', 'err');
   }
   if (!confirm('Supprimer cette shasse et ses paris ? Les points déjà gagnés seront conservés au classement. Action définitive.')) return;
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
@@ -395,7 +395,7 @@ const pointsFor = (p, rank) => p.diff === 0 ? 5 : ({ 1: 3, 2: 2, 3: 1 }[rank] ||
 
 function seasonRanking() {
   const accounts = new Map();
-  for (const player of [...state.bets, ...state.archivedPoints]) {
+  for (const player of [...state.bets, ...state.pointHistory]) {
     if (player.user_id && player.twitch_name) {
       accounts.set(player.twitch_name.trim().toLocaleLowerCase('fr'), { user_id: player.user_id, avatar: player.twitch_avatar });
     }
@@ -404,31 +404,18 @@ function seasonRanking() {
     const key = p.name.trim().toLocaleLowerCase('fr');
     return [key, { ...p, ...accounts.get(key) }];
   }));
-  for (const archived of state.archivedPoints) {
-    const key = archived.twitch_name.trim().toLocaleLowerCase('fr');
+  for (const event of state.pointHistory) {
+    const key = event.twitch_name.trim().toLocaleLowerCase('fr');
     const current = players.get(key) || {
-      name: archived.twitch_name,
+      name: event.twitch_name,
       points: 0,
-      user_id: archived.user_id,
-      avatar: archived.twitch_avatar,
+      user_id: event.user_id,
+      avatar: event.twitch_avatar,
     };
-    current.user_id = current.user_id || archived.user_id;
-    current.avatar = current.avatar || archived.twitch_avatar;
-    current.points += archived.points;
+    current.user_id = current.user_id || event.user_id;
+    current.avatar = current.avatar || event.twitch_avatar;
+    current.points += event.points;
     players.set(key, current);
-  }
-  for (const cur of state.hunts) {
-    if (cur.result == null || !cur.result_at || new Date(cur.result_at) < new Date(SEASON_START_AT)) continue;
-    const bets = betsOfHunt(cur.id);
-    const ranked = groupPlayers(bets, cur.result);
-    ranked.forEach((p, i) => {
-      const key = p.name.trim().toLocaleLowerCase('fr');
-      const current = players.get(key) || { name: p.name, points: 0, user_id: p.user_id, avatar: p.avatar };
-      current.user_id = current.user_id || p.user_id;
-      current.avatar = current.avatar || p.avatar;
-      current.points += pointsFor(p, i + 1);
-      players.set(key, current);
-    });
   }
   return [...players.values()].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'fr'));
 }
@@ -493,6 +480,72 @@ async function saveBaseline(ev) {
     players.push({ name, points });
   }
   await saveSiteContent({ leaderboard: players }, 'Scores de départ mis à jour.');
+}
+
+async function savePointsAdjustment(ev) {
+  ev.preventDefault();
+  const form = ev.target.elements;
+  const player = seasonRanking().find(p => p.name === form.player.value);
+  const targetPoints = Number(form.points.value);
+  const reason = form.reason.value.trim();
+  if (!player) return toast('Choisis un joueur du classement.', 'err');
+  if (!Number.isInteger(targetPoints) || targetPoints < 0 || targetPoints > 100000) {
+    return toast('Le total doit être un nombre entier entre 0 et 100 000.', 'err');
+  }
+  if (reason.length < 2 || reason.length > 500) return toast('Indique un motif de 2 à 500 caractères.', 'err');
+  const delta = targetPoints - player.points;
+  if (!delta) return toast('Ce joueur a déjà ce nombre de points.', 'err');
+  const { error } = await sb.rpc('admin_adjust_player_points', {
+    p_twitch_name: player.name,
+    p_delta: delta,
+    p_reason: reason,
+  });
+  if (error) return toast('Modification des points impossible : ' + error.message, 'err');
+  await refresh();
+  toast('Total de ' + player.name + ' ajusté à ' + targetPoints + ' points.');
+}
+
+function adminPoints() {
+  const players = seasonRanking();
+  const history = state.pointHistory.map(event => {
+    const deleted = event.hunt_id && !state.hunts.some(hunt => hunt.id === event.hunt_id);
+    const details = event.event_type === 'hunt'
+      ? 'Paris : ' + (event.guesses || []).join(' et ') + ' — résultat validé par le streamer : ' + event.winning_result
+      : event.event_type === 'adjustment'
+        ? 'Ajustement admin — ' + event.reason
+        : event.event_type === 'reversal'
+          ? 'Points retirés — ' + event.reason
+          : 'Historique antérieur incomplet : détail du pari ou résultat non conservé.';
+    return h('div', { class: 'point-history-row' },
+      h('time', {}, fmtDate(event.created_at)),
+      h('strong', {}, event.twitch_name),
+      h('span', { class: 'point-history-delta' }, (event.points > 0 ? '+' : '') + event.points + ' pts'),
+      h('div', { class: 'point-history-details' },
+        event.event_type === 'hunt' || event.event_type === 'reversal' || event.event_type === 'legacy'
+          ? h('strong', {}, (event.hunt_title || 'Shasse') + (deleted ? ' (supprimée)' : ''))
+          : null,
+        h('span', {}, details),
+        event.platform && h('small', {}, event.platform === 'switch' ? 'Switch' : 'DS/3DS')));
+  });
+  return h('div', {},
+    h('section', { class: 'card admin' },
+      h('h2', {}, 'Modifier le total de points'),
+      h('p', { class: 'hint' }, 'L’ajustement est enregistré dans l’historique et ne modifie pas les points déjà gagnés.'),
+      h('form', { class: 'point-adjust-form', onsubmit: savePointsAdjustment },
+        h('label', {}, 'Joueur',
+          h('select', { name: 'player', required: true },
+            h('option', { value: '', disabled: true, selected: true }, 'Choisir un joueur'),
+            players.map(player => h('option', { value: player.name }, player.name + ' — ' + player.points + ' pts')))),
+        h('label', {}, 'Nouveau total',
+          h('input', { name: 'points', type: 'number', min: 0, max: 100000, step: 1, required: true })),
+        h('label', {}, 'Motif de la modification',
+          h('input', { name: 'reason', type: 'text', maxlength: 500, required: true })),
+        h('button', { class: 'gold', type: 'submit' }, 'Enregistrer le total'))),
+    h('section', { class: 'card admin' },
+      h('h2', {}, 'Historique des points'),
+      h('div', { class: 'point-history' }, history.length
+        ? history
+        : h('p', { class: 'empty' }, 'Aucun point enregistré pour le moment.'))));
 }
 
 function leaderboardContentDraft() {
@@ -856,7 +909,7 @@ function adminNavigation() {
     if (key === 'people') await loadPeople();
     render();
   };
-  const mainItems = [['hunts', 'Shasses'], ['people', 'Joueurs']].map(([key, label]) =>
+  const mainItems = [['hunts', 'Shasses'], ['people', 'Joueurs'], ['points', 'Points']].map(([key, label]) =>
     h('button', { class: 'admin-nav-button', 'aria-current': state.adminPage === key ? 'page' : null,
       onclick: () => navigate(key) }, label));
   return [
@@ -878,7 +931,8 @@ function adminNavigation() {
 function adminView() {
   const cur = state.adminHuntId ? state.hunts.find(x => x.id === state.adminHuntId) : null;
   return state.adminPage === 'content' ? adminContent() :
-    state.adminPage === 'people' ? adminPeople() : cur ? adminDetail(cur) : adminList();
+    state.adminPage === 'people' ? adminPeople() :
+      state.adminPage === 'points' ? adminPoints() : cur ? adminDetail(cur) : adminList();
 }
 
 function render() {
