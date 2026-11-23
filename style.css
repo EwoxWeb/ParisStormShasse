@@ -32,8 +32,9 @@
   .admin-nav-button { padding: 8px 14px; background: var(--card); font-weight: 700; }
   .admin-nav-button:hover, .admin-nav-button[aria-current="page"] { background: var(--gold); color: var(--gold-ink); }
   .admin-dropdown { position: relative; }
-  .admin-dropdown-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: none; flex-direction: column; gap: 4px; min-width: 220px; padding: 6px; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; box-shadow: 3px 3px 0 var(--shadow); }
+  .admin-dropdown-menu { position: absolute; top: 100%; left: 0; z-index: 20; display: none; flex-direction: column; gap: 4px; min-width: 220px; padding: 6px; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; box-shadow: 3px 3px 0 var(--shadow); }
   .admin-dropdown:hover .admin-dropdown-menu, .admin-dropdown:focus-within .admin-dropdown-menu { display: flex; }
+  .admin-dropdown > .admin-nav-button:hover { transform: none; }
   .admin-dropdown-item { width: 100%; padding: 8px 10px; text-align: left; background: transparent; border-color: transparent; box-shadow: none; }
   .admin-dropdown-item:hover, .admin-dropdown-item[aria-current="page"] { background: var(--soft); transform: none; box-shadow: none; }
 

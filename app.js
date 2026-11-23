@@ -19,7 +19,7 @@ const PLATFORMS = [
 ];
 
 let sb = null;
-const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
+const state = { user: null, isAdmin: false, hunts: [], huntId: null, bets: [], archivedPoints: [], archivedPointsLoaded: false, tab: 'switch', page: 'bets', view: 'public', adminHuntId: null, counts: {}, manuals: [], twitchAccts: [], sel: { m: null, t: null }, adminPage: 'hunts', contentPage: 'rules', siteContent: null, siteContentErrorShown: false, baselineDraft: null, rulesDraft: null, leaderboardContentDraft: null };
 
 /* Liens directs : #sw ouvre l'onglet Switch, #ds ouvre l'onglet 3DS (#switch et #3ds marchent aussi) */
 const HASH_TO_TAB = { sw: 'switch', switch: 'switch', ds: '3ds', '3ds': '3ds' };
@@ -85,6 +85,12 @@ async function loadBets() {
   if (error) return toast('Impossible de charger les paris : ' + error.message, 'err');
   state.bets = data;
 }
+async function loadArchivedPoints() {
+  const { data, error } = await sb.from('hunt_points_archive').select('user_id, twitch_name, twitch_avatar, points');
+  if (error) return toast('Impossible de charger les points archivés : ' + error.message + ' (vérifie la migration v15).', 'err');
+  state.archivedPoints = data;
+  state.archivedPointsLoaded = true;
+}
 async function loadAdmin() {
   state.isAdmin = false;
   if (!state.user) return;
@@ -110,7 +116,7 @@ async function loadSiteContent() {
     leaderboardContent: validLeaderboardContent(data.leaderboard_content),
   };
 }
-async function refresh() { await loadHunts(); await loadBets(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
+async function refresh() { await loadHunts(); await loadBets(); await loadArchivedPoints(); await loadSiteContent(); if (state.view === 'admin') await loadCounts(); render(); }
 
 /* navigation du panel admin */
 async function toggleAdmin() {
@@ -193,8 +199,11 @@ async function reopenResult() {
   refresh();
 }
 async function deleteHunt() {
-  if (!confirm('Supprimer cette shasse et tous ses paris ? Action définitive.')) return;
   const cur = hunt();
+  if (cur?.result != null && cur.result_at && new Date(cur.result_at) >= new Date(SEASON_START_AT) && !state.archivedPointsLoaded) {
+    return toast('Suppression bloquée : les points ne peuvent pas être archivés. Vérifie que la migration v15 est installée.', 'err');
+  }
+  if (!confirm('Supprimer cette shasse et ses paris ? Les points déjà gagnés seront conservés au classement. Action définitive.')) return;
   const { error } = await sb.from('hunts').delete().eq('id', state.huntId);
   if (error) return toast(error.message, 'err');
   removeImageFile(cur?.image_path);
@@ -386,15 +395,28 @@ const pointsFor = (p, rank) => p.diff === 0 ? 5 : ({ 1: 3, 2: 2, 3: 1 }[rank] ||
 
 function seasonRanking() {
   const accounts = new Map();
-  for (const bet of state.bets) {
-    if (bet.user_id && bet.twitch_name) {
-      accounts.set(bet.twitch_name.trim().toLocaleLowerCase('fr'), { user_id: bet.user_id, avatar: bet.twitch_avatar });
+  for (const player of [...state.bets, ...state.archivedPoints]) {
+    if (player.user_id && player.twitch_name) {
+      accounts.set(player.twitch_name.trim().toLocaleLowerCase('fr'), { user_id: player.user_id, avatar: player.twitch_avatar });
     }
   }
   const players = new Map(siteContent().leaderboard.map(p => {
     const key = p.name.trim().toLocaleLowerCase('fr');
     return [key, { ...p, ...accounts.get(key) }];
   }));
+  for (const archived of state.archivedPoints) {
+    const key = archived.twitch_name.trim().toLocaleLowerCase('fr');
+    const current = players.get(key) || {
+      name: archived.twitch_name,
+      points: 0,
+      user_id: archived.user_id,
+      avatar: archived.twitch_avatar,
+    };
+    current.user_id = current.user_id || archived.user_id;
+    current.avatar = current.avatar || archived.twitch_avatar;
+    current.points += archived.points;
+    players.set(key, current);
+  }
   for (const cur of state.hunts) {
     if (cur.result == null || !cur.result_at || new Date(cur.result_at) < new Date(SEASON_START_AT)) continue;
     const bets = betsOfHunt(cur.id);
