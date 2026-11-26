@@ -124,7 +124,9 @@
   .content-paragraph-text textarea { display: block; min-height: 120px; line-height: 1.5; }
   .content-paragraph-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: end; }
   .content-paragraph-controls .chk { flex-direction: row; align-items: center; white-space: nowrap; }
+  .content-list-hint { margin: -4px 0 0; }
   .content-list-item-edit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+  .content-list-item-edit textarea { display: block; min-height: 84px; line-height: 1.5; }
   .content-section-edit label { min-width: 0; }
   .content-section-heading .danger { justify-self: start; }
   .content-section-edit select { width: 100%; padding: 8px 10px; background: var(--card); border: 2px solid var(--edge); border-radius: 8px; }

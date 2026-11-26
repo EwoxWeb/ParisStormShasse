@@ -582,10 +582,11 @@ function renderContentSectionsEditor(sections) {
           h('select', { onchange: ev => { sections[sectionIndex].listStyle = ev.target.value; } },
             [['none', 'Aucune liste'], ['unordered', 'À puces'], ['ordered', 'Numérotée']]
               .map(([value, label]) => h('option', { value, selected: section.listStyle === value }, label)))),
+        h('p', { class: 'hint content-list-hint' }, 'Tu peux écrire sur plusieurs lignes, utiliser **gras** ou *italique*.'),
         section.items.map((item, itemIndex) =>
           h('div', { class: 'content-list-item-edit' },
             h('label', {}, 'Élément ' + (itemIndex + 1),
-              h('input', { type: 'text', maxlength: 500, value: item,
+              h('textarea', { maxlength: 500, rows: 3, value: item,
                 oninput: ev => { sections[sectionIndex].items[itemIndex] = ev.target.value; } })),
             h('button', { class: 'danger', type: 'button',
               onclick: () => { sections[sectionIndex].items.splice(itemIndex, 1); render(); } }, 'Supprimer'))),
@@ -784,6 +785,24 @@ async function saveLeaderboardContent(ev) {
 }
 
 function renderContentSections(sections) {
+  const formattedText = text => {
+    const nodes = [];
+    const lines = text.split(/\r?\n/);
+    const inlinePattern = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+    lines.forEach((line, lineIndex) => {
+      let cursor = 0;
+      let match;
+      while ((match = inlinePattern.exec(line))) {
+        if (match.index > cursor) nodes.push(line.slice(cursor, match.index));
+        nodes.push(match[1] ? h('strong', {}, match[1]) : h('em', {}, match[2]));
+        cursor = inlinePattern.lastIndex;
+      }
+      if (cursor < line.length) nodes.push(line.slice(cursor));
+      if (lineIndex < lines.length - 1) nodes.push(h('br', {}));
+      inlinePattern.lastIndex = 0;
+    });
+    return nodes;
+  };
   return sections.map(section => h('section', { class: 'info-section' },
     section.title && h('h2', {}, section.title),
     section.paragraphs.map(paragraph => h('p', { class: paragraph.highlight ? 'notice' : null },
@@ -791,7 +810,7 @@ function renderContentSections(sections) {
       paragraph.text)),
     section.items.length && section.listStyle !== 'none'
       ? h(section.listStyle === 'ordered' ? 'ol' : 'ul', { class: 'rewards' },
-          section.items.map(item => h('li', {}, item)))
+          section.items.map(item => h('li', {}, formattedText(item))))
       : null));
 }
 
